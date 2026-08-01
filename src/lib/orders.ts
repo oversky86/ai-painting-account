@@ -44,13 +44,13 @@ query AccountWorkspace {
           totalPaidAmount { amount currencyCode }
           totalOutstandingAmount { amount currencyCode }
         }
-        transactions(first: 20) {
-          nodes {
-            createdAt
-            processedAt
-            kind
-            status
-            amountSet { presentmentMoney { amount currencyCode } }
+        transactions {
+          createdAt
+          processedAt
+          kind
+          status
+          transactionAmount {
+            presentmentMoney { amount currencyCode }
           }
         }
         lineItems(first: 10) {
@@ -108,17 +108,15 @@ type CaOrder = {
     totalPaidAmount?: { amount: string; currencyCode: string } | null;
     totalOutstandingAmount?: { amount: string; currencyCode: string } | null;
   } | null;
-  transactions?: {
-    nodes: Array<{
-      createdAt?: string | null;
-      processedAt?: string | null;
-      kind?: string | null;
-      status?: string | null;
-      amountSet?: {
-        presentmentMoney?: { amount: string; currencyCode: string } | null;
-      } | null;
-    }>;
-  } | null;
+  transactions?: Array<{
+    createdAt?: string | null;
+    processedAt?: string | null;
+    kind?: string | null;
+    status?: string | null;
+    transactionAmount?: {
+      presentmentMoney?: { amount: string; currencyCode: string } | null;
+    } | null;
+  }> | null;
   lineItems?: {
     nodes: Array<{
       title?: string | null;
@@ -224,7 +222,7 @@ function formatDate(value?: string | null) {
 
 function mapPastCharges(order: CaOrder): PaymentChargeRow[] {
   const currency = order.totalPrice?.currencyCode || "USD";
-  return (order.transactions?.nodes || [])
+  return (order.transactions || [])
     .filter((t) => {
       const kind = (t.kind || "").toUpperCase();
       const status = (t.status || "").toUpperCase();
@@ -235,7 +233,7 @@ function mapPastCharges(order: CaOrder): PaymentChargeRow[] {
       );
     })
     .map((t) => {
-      const amount = t.amountSet?.presentmentMoney;
+      const amount = t.transactionAmount?.presentmentMoney;
       return {
         label: t.kind || "Payment",
         description: `Transaction ${t.kind || ""}`.trim(),
