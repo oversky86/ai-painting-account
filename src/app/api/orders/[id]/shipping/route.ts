@@ -38,6 +38,7 @@ export async function POST(
 
   const res = await postSignedWrite("/api/account/order-write", {
     type: "shipping",
+    shop: session.shopDomain,
     orderId: decodeURIComponent(id),
     customerId: session.customerId,
     address: body.address,

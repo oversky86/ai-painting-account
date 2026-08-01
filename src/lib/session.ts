@@ -18,7 +18,26 @@ export type PkceState = {
   nonce: string;
   codeVerifier: string;
   returnTo: string;
+  shopDomain: string;
 };
+
+const SHOP_COOKIE = "vb_account_shop";
+
+export async function setShopHint(shopDomain: string) {
+  const jar = await cookies();
+  jar.set(SHOP_COOKIE, shopDomain, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+}
+
+export async function getShopHint(): Promise<string | null> {
+  const jar = await cookies();
+  return jar.get(SHOP_COOKIE)?.value || null;
+}
 
 export async function sealJson<T extends Record<string, unknown>>(
   payload: T,

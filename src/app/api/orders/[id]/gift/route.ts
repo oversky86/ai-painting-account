@@ -29,6 +29,7 @@ export async function POST(
 
   const res = await postSignedWrite("/api/account/order-write", {
     type: "gift",
+    shop: session.shopDomain,
     orderId: decodeURIComponent(id),
     customerId: session.customerId,
     giftMessage: body.giftMessage,

@@ -1,3 +1,9 @@
+import {
+  getDefaultShopConfig,
+  publicConfigFor,
+  type ShopConfig,
+} from "./shops";
+
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -6,30 +12,22 @@ function required(name: string): string {
   return value.replace(/\/$/, "");
 }
 
-function optional(name: string, fallback = ""): string {
-  return (process.env[name]?.trim() || fallback).replace(/\/$/, "");
-}
-
 export function getEnv() {
+  const defaultShop = getDefaultShopConfig();
   return {
     accountWebUrl: required("ACCOUNT_WEB_URL"),
-    storeDomain: required("SHOPIFY_STORE_DOMAIN"),
-    clientId: required("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID"),
     sessionSecret: required("SESSION_SECRET"),
     hmacSecret: required("ACCOUNT_HMAC_SECRET"),
     appWriteApiUrl: required("APP_WRITE_API_URL"),
-    storefrontUrl: optional("STOREFRONT_URL"),
-    nativeAccountUrl: optional("NATIVE_ACCOUNT_URL"),
-    nativeAccountProfileUrl: optional("NATIVE_ACCOUNT_PROFILE_URL"),
+    /** @deprecated Prefer resolveShopConfig — kept for callers that need a default */
+    storeDomain: defaultShop.storeDomain,
+    clientId: defaultShop.clientId,
+    storefrontUrl: defaultShop.storefrontUrl,
+    nativeAccountUrl: defaultShop.nativeAccountUrl,
+    nativeAccountProfileUrl: defaultShop.nativeAccountProfileUrl,
   };
 }
 
-export function getPublicConfig() {
-  return {
-    storefrontUrl: optional("STOREFRONT_URL"),
-    nativeAccountUrl: optional("NATIVE_ACCOUNT_URL"),
-    nativeAccountProfileUrl: optional("NATIVE_ACCOUNT_PROFILE_URL"),
-    createPath: "/products/custom-oil-painting",
-    cartPath: "/cart",
-  };
+export function getPublicConfig(shop?: ShopConfig) {
+  return publicConfigFor(shop || getDefaultShopConfig());
 }

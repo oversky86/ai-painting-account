@@ -1,25 +1,25 @@
 import { NextResponse } from "next/server";
-import { getEnv, getPublicConfig } from "@/lib/env";
+import { getEnv } from "@/lib/env";
 import { clearSession, getSession } from "@/lib/session";
 import { buildLogoutUrl } from "@/lib/shopify-ca";
+import { tryResolveShopConfig } from "@/lib/shops";
 
 export async function GET() {
   const session = await getSession();
   const idToken = session?.idToken;
+  const shop = tryResolveShopConfig(session?.shopDomain);
   await clearSession();
 
-  const { storefrontUrl } = getPublicConfig();
   const { accountWebUrl } = getEnv();
 
   try {
     if (idToken) {
-      const caLogout = await buildLogoutUrl(idToken);
-      // After CA logout, bounce to storefront account logout if configured
-      if (storefrontUrl) {
+      const caLogout = await buildLogoutUrl(shop, idToken);
+      if (shop.storefrontUrl) {
         const bridge = new URL(caLogout);
         bridge.searchParams.set(
           "post_logout_redirect_uri",
-          `${storefrontUrl}/account/logout`,
+          `${shop.storefrontUrl}/account/logout`,
         );
         return NextResponse.redirect(bridge.toString());
       }
@@ -29,8 +29,8 @@ export async function GET() {
     console.error("[auth/logout]", err);
   }
 
-  if (storefrontUrl) {
-    return NextResponse.redirect(`${storefrontUrl}/account/logout`);
+  if (shop.storefrontUrl) {
+    return NextResponse.redirect(`${shop.storefrontUrl}/account/logout`);
   }
   return NextResponse.redirect(`${accountWebUrl}/`);
 }

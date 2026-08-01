@@ -1,3 +1,4 @@
+import type { ShopConfig } from "./shops";
 import { getEnv } from "./env";
 import type { SessionTokens } from "./types";
 
@@ -11,8 +12,8 @@ type CustomerApiConfig = {
   graphql_api: string;
 };
 
-let openIdCache: { at: number; value: OpenIdConfig } | null = null;
-let apiCache: { at: number; value: CustomerApiConfig } | null = null;
+const openIdCache = new Map<string, { at: number; value: OpenIdConfig }>();
+const apiCache = new Map<string, { at: number; value: CustomerApiConfig }>();
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { next: { revalidate: 3600 } });
@@ -20,40 +21,44 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function getOpenIdConfig(): Promise<OpenIdConfig> {
-  if (openIdCache && Date.now() - openIdCache.at < 3600_000) {
-    return openIdCache.value;
+export async function getOpenIdConfig(shop: ShopConfig): Promise<OpenIdConfig> {
+  const cached = openIdCache.get(shop.storeDomain);
+  if (cached && Date.now() - cached.at < 3600_000) {
+    return cached.value;
   }
-  const { storeDomain } = getEnv();
   const value = await fetchJson<OpenIdConfig>(
-    `https://${storeDomain}/.well-known/openid-configuration`,
+    `https://${shop.storeDomain}/.well-known/openid-configuration`,
   );
-  openIdCache = { at: Date.now(), value };
+  openIdCache.set(shop.storeDomain, { at: Date.now(), value });
   return value;
 }
 
-export async function getCustomerApiConfig(): Promise<CustomerApiConfig> {
-  if (apiCache && Date.now() - apiCache.at < 3600_000) {
-    return apiCache.value;
+export async function getCustomerApiConfig(
+  shop: ShopConfig,
+): Promise<CustomerApiConfig> {
+  const cached = apiCache.get(shop.storeDomain);
+  if (cached && Date.now() - cached.at < 3600_000) {
+    return cached.value;
   }
-  const { storeDomain } = getEnv();
   const value = await fetchJson<CustomerApiConfig>(
-    `https://${storeDomain}/.well-known/customer-account-api`,
+    `https://${shop.storeDomain}/.well-known/customer-account-api`,
   );
-  apiCache = { at: Date.now(), value };
+  apiCache.set(shop.storeDomain, { at: Date.now(), value });
   return value;
 }
 
-export async function exchangeCode(params: {
-  code: string;
-  codeVerifier: string;
-  redirectUri: string;
-}): Promise<SessionTokens> {
-  const { clientId } = getEnv();
-  const { token_endpoint } = await getOpenIdConfig();
+export async function exchangeCode(
+  shop: ShopConfig,
+  params: {
+    code: string;
+    codeVerifier: string;
+    redirectUri: string;
+  },
+): Promise<SessionTokens> {
+  const { token_endpoint } = await getOpenIdConfig(shop);
   const body = new URLSearchParams({
     grant_type: "authorization_code",
-    client_id: clientId,
+    client_id: shop.clientId,
     redirect_uri: params.redirectUri,
     code: params.code,
     code_verifier: params.codeVerifier,
@@ -78,17 +83,18 @@ export async function exchangeCode(params: {
     refreshToken: json.refresh_token,
     idToken: json.id_token,
     expiresAt: Date.now() + json.expires_in * 1000,
+    shopDomain: shop.storeDomain,
   };
 }
 
 export async function refreshTokens(
+  shop: ShopConfig,
   refreshToken: string,
 ): Promise<SessionTokens> {
-  const { clientId } = getEnv();
-  const { token_endpoint } = await getOpenIdConfig();
+  const { token_endpoint } = await getOpenIdConfig(shop);
   const body = new URLSearchParams({
     grant_type: "refresh_token",
-    client_id: clientId,
+    client_id: shop.clientId,
     refresh_token: refreshToken,
   });
   const res = await fetch(token_endpoint, {
@@ -111,15 +117,17 @@ export async function refreshTokens(
     refreshToken: json.refresh_token || refreshToken,
     idToken: json.id_token,
     expiresAt: Date.now() + json.expires_in * 1000,
+    shopDomain: shop.storeDomain,
   };
 }
 
 export async function caGraphql<T>(
+  shop: ShopConfig,
   accessToken: string,
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const { graphql_api } = await getCustomerApiConfig();
+  const { graphql_api } = await getCustomerApiConfig(shop);
   // Customer Account API expects the raw access token (shcat_...), not Bearer.
   const authorization = accessToken.startsWith("Bearer ")
     ? accessToken.slice("Bearer ".length).trim()
@@ -141,7 +149,10 @@ export async function caGraphql<T>(
     const text = await res.text();
     throw new Error(`CA GraphQL HTTP ${res.status}: ${text}`);
   }
-  const json = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
+  const json = (await res.json()) as {
+    data?: T;
+    errors?: Array<{ message: string }>;
+  };
   if (json.errors?.length) {
     throw new Error(json.errors.map((e) => e.message).join("; "));
   }
@@ -149,9 +160,12 @@ export async function caGraphql<T>(
   return json.data;
 }
 
-export async function buildLogoutUrl(idToken?: string): Promise<string> {
+export async function buildLogoutUrl(
+  shop: ShopConfig,
+  idToken?: string,
+): Promise<string> {
   const { accountWebUrl } = getEnv();
-  const { end_session_endpoint } = await getOpenIdConfig();
+  const { end_session_endpoint } = await getOpenIdConfig(shop);
   const url = new URL(end_session_endpoint);
   if (idToken) url.searchParams.set("id_token_hint", idToken);
   url.searchParams.set("post_logout_redirect_uri", `${accountWebUrl}/`);

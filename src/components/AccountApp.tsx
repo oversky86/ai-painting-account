@@ -37,6 +37,7 @@ type PublicConfig = {
   nativeAccountProfileUrl: string;
   createPath: string;
   cartPath: string;
+  storeDomain?: string;
 };
 
 type MeResponse = {
@@ -45,9 +46,23 @@ type MeResponse = {
   orders?: AccountOrder[];
   csrf?: string;
   config?: PublicConfig;
+  shop?: string;
   savedArtworkCount?: number;
   error?: string;
 };
+
+function shopFromLocation(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("shop") || "";
+}
+
+function loginHref(returnPath?: string): string {
+  const path = returnPath || window.location.pathname || "/orders";
+  const params = new URLSearchParams({ return_to: path });
+  const shop = shopFromLocation();
+  if (shop) params.set("shop", shop);
+  return `/api/auth/login?${params.toString()}`;
+}
 
 export default function AccountApp({ initialView = "orders" }: { initialView?: AccountView }) {
   const [activeView, setActiveView] = useState<AccountView>(initialView);
@@ -64,9 +79,23 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/me", { credentials: "same-origin" });
+      const shop = shopFromLocation();
+      const meUrl = shop
+        ? `/api/me?shop=${encodeURIComponent(shop)}`
+        : "/api/me";
+      const res = await fetch(meUrl, { credentials: "same-origin" });
       if (res.status === 401) {
-        window.location.href = `/api/auth/login?return_to=${encodeURIComponent(window.location.pathname)}`;
+        window.location.href = loginHref(window.location.pathname);
+        return;
+      }
+      if (res.status === 409) {
+        const mismatch = (await res.json()) as MeResponse;
+        const params = new URLSearchParams({
+          return_to: window.location.pathname || "/orders",
+        });
+        const nextShop = mismatch.shop || shop;
+        if (nextShop) params.set("shop", nextShop);
+        window.location.href = `/api/auth/login?${params.toString()}`;
         return;
       }
       const json = (await res.json()) as MeResponse;
@@ -161,7 +190,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       <div className="min-h-screen bg-[#FBF8F3] pt-16 text-[#2D241B]">
         <main className="mx-auto w-full max-w-[1280px] px-4 pb-[120px] pt-8">
           <p className="text-sm text-[#5F564B]">{error || "Unable to load account."}</p>
-          <a href="/api/auth/login" className={getButtonClasses("primary", "mt-6 px-5 py-3 text-sm")}>
+          <a href={loginHref("/orders")} className={getButtonClasses("primary", "mt-6 px-5 py-3 text-sm")}>
             Sign in
           </a>
         </main>

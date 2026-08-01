@@ -33,6 +33,7 @@ export async function POST(
 
   const res = await postSignedWrite("/api/account/order-write", {
     type: "review",
+    shop: session.shopDomain,
     orderId: decodeURIComponent(id),
     customerId: session.customerId,
     action: body.action,

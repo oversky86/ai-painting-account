@@ -12,6 +12,7 @@ import type {
   UpcomingChargeRow,
 } from "./types";
 import { caGraphql } from "./shopify-ca";
+import type { ShopConfig } from "./shops";
 
 const CUSTOMER_ORDERS_QUERY = `
 query AccountWorkspace {
@@ -313,11 +314,15 @@ function mapOrder(order: CaOrder): AccountOrder {
   };
 }
 
-export async function loadWorkspace(accessToken: string): Promise<{
+export async function loadWorkspace(
+  accessToken: string,
+  shop: ShopConfig,
+): Promise<{
   customer: CustomerSummary;
   orders: AccountOrder[];
 }> {
   const data = await caGraphql<{ customer: CaCustomer | null }>(
+    shop,
     accessToken,
     CUSTOMER_ORDERS_QUERY,
   );

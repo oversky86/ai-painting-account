@@ -90,4 +90,6 @@ export type SessionTokens = {
   idToken?: string;
   expiresAt: number;
   customerId?: string;
+  /** Canonical myshopify.com domain for this session */
+  shopDomain?: string;
 };
