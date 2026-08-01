@@ -120,13 +120,20 @@ export async function caGraphql<T>(
   variables?: Record<string, unknown>,
 ): Promise<T> {
   const { graphql_api } = await getCustomerApiConfig();
+  // Customer Account API expects the raw access token (shcat_...), not Bearer.
+  const authorization = accessToken.startsWith("Bearer ")
+    ? accessToken.slice("Bearer ".length).trim()
+    : accessToken.trim();
+  if (!authorization.startsWith("shcat_")) {
+    throw new Error(
+      `CA access token missing shcat_ prefix (got ${authorization.slice(0, 12)}…)`,
+    );
+  }
   const res = await fetch(graphql_api, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: accessToken.startsWith("Bearer ")
-        ? accessToken
-        : `Bearer ${accessToken}`,
+      Authorization: authorization,
     },
     body: JSON.stringify({ query, variables }),
   });
