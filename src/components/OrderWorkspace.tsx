@@ -675,7 +675,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
         left: pendingSelection.x + pendingSelection.width <= 42
           ? `clamp(0px, calc(${pendingSelection.x + pendingSelection.width}% + 16px), calc(100% - 292px))`
           : `clamp(0px, calc(${pendingSelection.x}% - 308px), calc(100% - 292px))`,
-        top: `clamp(0px, ${pendingSelection.y}%, calc(100% - 188px))`,
+        top: `clamp(0px, ${pendingSelection.y}%, calc(100% - 180px))`,
       }
     : undefined;
 
@@ -851,7 +851,7 @@ function PendingModificationEditor({
 
   return (
     <form
-      className={`min-h-[188px] rounded-[8px] border border-[#D8C8B6] bg-white p-[17px] shadow-[0_10px_24px_-8px_rgba(43,33,27,0.18)] ${className}`}
+      className={`min-h-[180px] rounded-[8px] border border-[#D8C8B6] bg-white p-[17px] shadow-[0_10px_24px_-8px_rgba(43,33,27,0.18)] ${className}`}
       style={style}
       onSubmit={(event) => {
         event.preventDefault();
@@ -870,14 +870,14 @@ function PendingModificationEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="modification-composer__action inline-flex min-h-11 w-20 items-center justify-center rounded-[6px] border border-[#DCCFBC] bg-white/[0.72] px-3 font-medium text-[#63523A]"
+          className="modification-composer__action relative inline-flex h-9 min-h-9 w-20 items-center justify-center rounded-[6px] border border-[#DCCFBC] bg-white/[0.72] px-3 font-medium text-[#63523A] before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!canSend}
-          className="modification-composer__action inline-flex min-h-11 w-20 items-center justify-center rounded-[6px] bg-[#33251D] px-3 font-semibold text-white disabled:bg-[#BDB9B6]"
+          className="modification-composer__action relative inline-flex h-9 min-h-9 w-20 items-center justify-center rounded-[6px] bg-[#33251D] px-3 font-semibold text-white before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] disabled:bg-[#BDB9B6]"
         >
           Send
         </button>
