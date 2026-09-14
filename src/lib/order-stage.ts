@@ -10,38 +10,45 @@ export function getOrderStageCopy(stage: OrderStage) {
       currentDescription: string;
       nextDescription: string;
     }
-  > = {
+    > = {
+    artwork: {
+      current: "Artwork in Progress",
+      next: "Portrait Review",
+      currentDescription:
+        "Your artist is creating the portrait. We will email you when the finished artwork is ready for review.",
+      nextDescription: "The finished portrait will be available here for approval.",
+    },
     review: {
-      current: "Painting Ready For Review",
-      next: "Shipping",
+      current: "Ready For Review",
+      next: "Preparing Shipment",
       currentDescription:
         "Payment is complete. Review the finished portrait before the studio prepares shipment.",
       nextDescription: "Approve the portrait or request a modification.",
     },
     revision: {
-      current: "Modifications Requested",
-      next: "Portrait Review",
+      current: "Revision In Progress",
+      next: "Ready For Review",
       currentDescription:
         "Your artist has the modification request and will prepare an updated review.",
       nextDescription: "You will be notified when the revised artwork is ready.",
     },
     framing: {
-      current: "Painting Approved",
-      next: "Shipping",
+      current: "Preparing Shipment",
+      next: "Shipped",
       currentDescription:
         "The artwork is approved. The selected presentation was confirmed during checkout.",
       nextDescription: "The studio will prepare shipping details next.",
     },
     shipping: {
-      current: "Ready For Shipping",
-      next: "Shipping Details",
+      current: "Shipped",
+      next: "Delivered",
       currentDescription:
         "The portrait is approved and the studio is preparing shipment.",
       nextDescription: "Shipping details will be confirmed before dispatch.",
     },
     complete: {
-      current: "Order Complete",
-      next: "Shipment In Progress",
+      current: "Shipped",
+      next: "Delivered",
       currentDescription:
         "The portrait, presentation, payment, and shipping details are confirmed.",
       nextDescription:
@@ -57,7 +64,7 @@ export function isCompletedOrderStage(orderStage?: OrderStage) {
 
 export function getOrderStatusBadgeClasses(orderStage: OrderStage) {
   const baseClasses =
-    "mt-4 inline-flex rounded-[8px] border px-3 py-2 text-xs font-semibold";
+    "inline-flex min-h-[34px] items-center justify-center rounded-[6px] border px-5 text-[13px] font-semibold";
   if (
     orderStage === "framing" ||
     orderStage === "shipping" ||
@@ -93,11 +100,18 @@ export function deriveOrderStage(input: {
     return "shipping";
   }
   if (input.reviewStatus === "modify_requested") return "revision";
+  if (
+    input.reviewStatus === "ready_for_review" ||
+    input.reviewStatus === "ready" ||
+    input.reviewStatus === "review"
+  ) {
+    return "review";
+  }
   if (input.reviewStatus === "approved") {
     if (fulfillment && fulfillment !== "UNFULFILLED") return "shipping";
     return "framing";
   }
-  return "review";
+  return "artwork";
 }
 
 export function computeEditability(input: {
@@ -124,7 +138,7 @@ export function computeEditability(input: {
     reason = "This order is already in transit.";
 
   const canReview =
-    (input.orderStage === "review" || input.orderStage === "revision") &&
+    input.orderStage === "review" &&
     !input.cancelledAt &&
     !input.closedAt;
 

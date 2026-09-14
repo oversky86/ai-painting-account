@@ -7,7 +7,7 @@ const buttonVariants = new Set<ButtonVariant>([
   "ghost",
 ]);
 
-export const getLabelClasses = (_theme?: string) =>
+export const getLabelClasses = () =>
   "mb-4 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8F816C]";
 
 export const getInputClasses = (className = "") =>
@@ -34,6 +34,6 @@ export const getButtonClasses = (
   if (variant === "secondary")
     return `${base} bg-[#EDE3D5] px-6 py-3 text-[#2D241B] hover:bg-[#E4D7C6] ${className}`;
   if (variant === "outline")
-    return `${base} border border-[#DCCFBC] bg-white/72 px-6 py-3 text-[#2D241B] hover:bg-[#F3EBDE] ${className}`;
+    return `${base} ui-outline-control border border-[#DCCFBC] bg-white/72 px-6 py-3 text-[#2D241B] ${className}`;
   return `${base} px-4 py-2 text-[#5F5549] hover:bg-[#EDE3D5] ${className}`;
 };

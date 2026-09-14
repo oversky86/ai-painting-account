@@ -1,4 +1,5 @@
 export type OrderStage =
+  | "artwork"
   | "review"
   | "revision"
   | "framing"
@@ -42,7 +43,39 @@ export type OrderLineMedia = {
   finishLabel?: string;
   frameLabel?: string;
   videoUrl?: string;
+  videoPosterUrl?: string;
   conceptTitle?: string;
+};
+
+export type ModificationSelection = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type ModificationNote = {
+  id: string;
+  text: string;
+  selection: ModificationSelection;
+};
+
+export type ArtworkVersion = {
+  id: string;
+  label: string;
+  title: string;
+  subtitle: string;
+  imageUrl?: string;
+  approved?: boolean;
+  notes: ModificationNote[];
+};
+
+export type TrackingDetails = {
+  company: string;
+  number: string;
+  url: string;
+  status: string;
+  estimatedDeliveryAt: string | null;
 };
 
 export type PaymentChargeRow = {
@@ -72,6 +105,9 @@ export type AccountOrder = {
   deliveryLabel: string;
   orderStage: OrderStage;
   reviewStatus: string | null;
+  modificationNotes: ModificationNote[];
+  artworkVersions: ArtworkVersion[];
+  tracking: TrackingDetails | null;
   giftMessage: GiftMessage | null;
   shippingAddress: AddressRecord | null;
   media: OrderLineMedia;

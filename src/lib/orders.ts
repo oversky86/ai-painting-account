@@ -7,8 +7,11 @@ import type {
   AddressRecord,
   CustomerSummary,
   GiftMessage,
+  ArtworkVersion,
+  ModificationNote,
   OrderLineMedia,
   PaymentChargeRow,
+  TrackingDetails,
   UpcomingChargeRow,
 } from "./types";
 import { caGraphql } from "./shopify-ca";
@@ -35,7 +38,14 @@ query AccountWorkspace {
         name
         processedAt
         financialStatus
-        fulfillments(first: 5) { nodes { status } }
+        fulfillments(first: 5) {
+          nodes {
+            status
+            latestShipmentStatus
+            estimatedDeliveryAt
+            trackingInformation { company number url }
+          }
+        }
         totalPrice { amount currencyCode }
         shippingAddress {
           firstName lastName address1 address2 city province zip country
@@ -64,6 +74,12 @@ query AccountWorkspace {
           value
         }
         giftMessage: metafield(namespace: "custom", key: "gift_message") {
+          value
+        }
+        modificationRequest: metafield(namespace: "custom", key: "modification_request") {
+          value
+        }
+        artworkVersions: metafield(namespace: "custom", key: "artwork_versions") {
           value
         }
       }
@@ -101,7 +117,18 @@ type CaOrder = {
   name: string;
   processedAt?: string | null;
   financialStatus?: string | null;
-  fulfillments?: { nodes: Array<{ status?: string | null }> } | null;
+  fulfillments?: {
+    nodes: Array<{
+      status?: string | null;
+      latestShipmentStatus?: string | null;
+      estimatedDeliveryAt?: string | null;
+      trackingInformation?: Array<{
+        company?: string | null;
+        number?: string | null;
+        url?: string | null;
+      }> | null;
+    }>;
+  } | null;
   totalPrice?: { amount: string; currencyCode: string } | null;
   shippingAddress?: CaAddress | null;
   paymentInformation?: {
@@ -126,6 +153,8 @@ type CaOrder = {
   } | null;
   reviewStatus?: { value?: string | null } | null;
   giftMessage?: { value?: string | null } | null;
+  modificationRequest?: { value?: string | null } | null;
+  artworkVersions?: { value?: string | null } | null;
 };
 
 function mapAddress(address?: CaAddress | null): AddressRecord | null {
@@ -194,6 +223,95 @@ function parseGift(raw: string | null): GiftMessage | null {
       message: raw,
     };
   }
+}
+
+function clampPercentage(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(100, Math.max(0, parsed));
+}
+
+function parseModificationNotes(raw: string | null): ModificationNote[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === "object" && "notes" in parsed
+        ? (parsed as { notes?: unknown }).notes
+        : [];
+    if (!Array.isArray(rows)) return [];
+    return rows.flatMap((row, index) => {
+      if (!row || typeof row !== "object") return [];
+      const item = row as Record<string, unknown>;
+      const selection =
+        item.selection && typeof item.selection === "object"
+          ? (item.selection as Record<string, unknown>)
+          : {};
+      const text = String(item.text || item.note || "").trim();
+      if (!text) return [];
+      return [{
+        id: String(item.id || index + 1),
+        text,
+        selection: {
+          x: clampPercentage(selection.x, 12 + index * 8),
+          y: clampPercentage(selection.y, 12 + index * 12),
+          width: clampPercentage(selection.width, 24),
+          height: clampPercentage(selection.height, 22),
+        },
+      }];
+    });
+  } catch {
+    return [{
+      id: "1",
+      text: raw,
+      selection: { x: 12, y: 12, width: 24, height: 22 },
+    }];
+  }
+}
+
+function parseArtworkVersions(
+  raw: string | null,
+  fallbackImage: string | undefined,
+): ArtworkVersion[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((row, index) => {
+      if (!row || typeof row !== "object") return [];
+      const item = row as Record<string, unknown>;
+      const notes = parseModificationNotes(JSON.stringify(item.notes || []));
+      return [{
+        id: String(item.id || `version-${index + 1}`),
+        label: String(item.label || `Revision ${String(index + 1).padStart(2, "0")}`),
+        title: String(item.title || `Artwork version ${index + 1}`),
+        subtitle: String(item.subtitle || `${notes.length} modification notes`),
+        imageUrl: String(item.imageUrl || item.image_url || fallbackImage || "") || undefined,
+        approved: Boolean(item.approved),
+        notes,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function collectTracking(order: CaOrder): TrackingDetails | null {
+  for (const fulfillment of order.fulfillments?.nodes || []) {
+    const tracking = fulfillment.trackingInformation?.find(
+      (item) => item.number || item.url,
+    );
+    if (!tracking) continue;
+    return {
+      company: tracking.company || "Carrier",
+      number: tracking.number || "",
+      url: tracking.url || "",
+      status: fulfillment.latestShipmentStatus || fulfillment.status || "In transit",
+      estimatedDeliveryAt: fulfillment.estimatedDeliveryAt || null,
+    };
+  }
+  return null;
 }
 
 function money(amount?: string | null, currency = "USD") {
@@ -283,6 +401,13 @@ function mapOrder(order: CaOrder): AccountOrder {
     orderStage,
   });
   const currency = order.totalPrice?.currencyCode || "USD";
+  const modificationNotes = parseModificationNotes(
+    order.modificationRequest?.value || null,
+  );
+  const artworkVersions = parseArtworkVersions(
+    order.artworkVersions?.value || null,
+    media.paintingUrl || media.photoUrl,
+  );
 
   return {
     id: order.id,
@@ -298,6 +423,9 @@ function mapOrder(order: CaOrder): AccountOrder {
     deliveryLabel: "Standard",
     orderStage,
     reviewStatus,
+    modificationNotes,
+    artworkVersions,
+    tracking: collectTracking(order),
     giftMessage: parseGift(order.giftMessage?.value || null),
     shippingAddress: mapAddress(order.shippingAddress),
     media,
