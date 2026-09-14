@@ -56,7 +56,11 @@ function shopFromLocation() {
 }
 
 function previewStageFromLocation(): OrderStage | null {
-  if (typeof window === "undefined" || process.env.NODE_ENV === "production") return null;
+  if (typeof window === "undefined") return null;
+  const previewEnabled =
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PUBLIC_ENABLE_DESIGN_PREVIEW === "true";
+  if (!previewEnabled) return null;
   const value = new URLSearchParams(window.location.search).get("preview") as OrderStage | null;
   return value && previewStages.has(value) ? value : null;
 }
