@@ -202,12 +202,17 @@ function collectMedia(order: CaOrder): OrderLineMedia {
     const attrs = line.customAttributes || [];
     result.paintingUrl =
       result.paintingUrl || attr(attrs, "painting_url");
+    result.aiPreviewUrl = result.aiPreviewUrl || attr(attrs, "painting_url");
     result.photoUrl =
       result.photoUrl || attr(attrs, "original_photo_url");
     result.style = result.style || attr(attrs, "style");
     result.keywords = result.keywords || attr(attrs, "keywords");
     result.size = result.size || attr(attrs, "size");
-    result.finishLabel = result.finishLabel || attr(attrs, "finish");
+    result.finishLabel =
+      result.finishLabel ||
+      attr(attrs, "presentation") ||
+      attr(attrs, "finish_type") ||
+      attr(attrs, "finish");
     result.frameLabel = result.frameLabel || attr(attrs, "frame");
     result.videoUrl = result.videoUrl || attr(attrs, "studio_video_url");
     result.conceptTitle =
@@ -462,109 +467,130 @@ function mapOrder(order: CaOrder): AccountOrder {
   };
 }
 
-async function enrichOrderFromPetApp(
-  order: AccountOrder,
+type PortraitHistory = {
+  businessStatus?: string;
+  versionCount?: number;
+  modificationCount?: number;
+  versions?: Array<{
+    versionNumber: number;
+    imageUrl?: string | null;
+    videoUrl?: string | null;
+    createdAt?: string;
+  }>;
+  modificationRequests?: Array<{
+    againstVersion: number;
+    createdAt?: string;
+    notes: ModificationNote[];
+  }>;
+};
+
+const APPROVED_STATUSES = new Set(["prepare_shipment", "shipped"]);
+
+/** One signed request for all orders instead of one per order. */
+async function fetchPortraitHistories(
+  orders: AccountOrder[],
   shop: ShopConfig,
   customerId: string,
-): Promise<AccountOrder> {
+): Promise<Record<string, PortraitHistory>> {
+  if (!orders.length) return {};
   try {
     const res = await postSignedWrite("/api/account/order-write", {
-      type: "portrait_history",
+      type: "portrait_history_batch",
       shop: shop.storeDomain,
-      orderId: order.id,
+      orderIds: orders.map((order) => order.id),
       customerId,
     });
     const json = (await res.json().catch(() => null)) as {
       ok?: boolean;
-      businessStatus?: string;
-      versionCount?: number;
-      modificationCount?: number;
-      versions?: Array<{
-        versionNumber: number;
-        imageUrl?: string | null;
-        videoUrl?: string | null;
-        createdAt?: string;
-      }>;
-      modificationRequests?: Array<{
-        againstVersion: number;
-        createdAt?: string;
-        notes: ModificationNote[];
-      }>;
+      orders?: Record<string, PortraitHistory>;
     } | null;
-    if (!res.ok || !json?.ok) return order;
+    if (!res.ok || !json?.ok) return {};
+    return json.orders || {};
+  } catch (err) {
+    console.error("[orders] fetchPortraitHistories failed", err);
+    return {};
+  }
+}
 
-    const businessStatus =
-      json.businessStatus || order.businessStatus || "order_placed";
-    const versionCount = json.versionCount ?? 0;
-    const latestVersion = json.versions?.[json.versions.length - 1];
-    const latestRequest =
-      json.modificationRequests?.[json.modificationRequests.length - 1];
+function applyPortraitHistory(
+  order: AccountOrder,
+  history: PortraitHistory | undefined,
+): AccountOrder {
+  if (!history) return order;
 
-    const artworkVersions: ArtworkVersion[] = (json.versions || []).map(
-      (v) => {
-        const matching = json.modificationRequests?.find(
-          (r) => r.againstVersion === v.versionNumber,
-        );
-        return {
-          id: `v${v.versionNumber}`,
-          label: `VERSION ${String(v.versionNumber).padStart(2, "0")}`,
-          title: `Portrait version ${v.versionNumber}`,
-          subtitle: matching
+  const businessStatus =
+    history.businessStatus || order.businessStatus || "order_placed";
+  const versionCount = history.versionCount ?? 0;
+  const versions = history.versions || [];
+  const requests = history.modificationRequests || [];
+  const latestVersion = versions[versions.length - 1];
+  const latestRequest = requests[requests.length - 1];
+  const approved = APPROVED_STATUSES.has(businessStatus);
+
+  const artworkVersions: ArtworkVersion[] = versions
+    .map((v) => {
+      const matching = requests.find((r) => r.againstVersion === v.versionNumber);
+      const isFinal = approved && v.versionNumber === latestVersion?.versionNumber;
+      return {
+        id: `v${v.versionNumber}`,
+        label: isFinal
+          ? "FINAL APPROVED"
+          : `VERSION ${String(v.versionNumber).padStart(2, "0")}`,
+        title: isFinal ? "Final Portrait" : `Portrait version ${v.versionNumber}`,
+        subtitle: isFinal
+          ? "Approved · Ready for shipment"
+          : matching
             ? `${matching.notes.length} modification notes`
             : "Studio delivery",
-          imageUrl: v.imageUrl || undefined,
-          approved: false,
-          notes: matching?.notes || [],
-        };
-      },
-    );
+        imageUrl: v.imageUrl || undefined,
+        approved: isFinal,
+        notes: matching?.notes || [],
+      };
+    })
+    .reverse();
 
-    const media = {
-      ...order.media,
-      paintingUrl: latestVersion?.imageUrl || order.media.paintingUrl,
-      videoUrl: latestVersion?.videoUrl || order.media.videoUrl,
-      videoPosterUrl: latestVersion?.imageUrl || order.media.videoPosterUrl,
-    };
+  const media = {
+    ...order.media,
+    paintingUrl: latestVersion?.imageUrl || order.media.paintingUrl,
+    videoUrl: latestVersion?.videoUrl || order.media.videoUrl,
+    videoPosterUrl: latestVersion?.imageUrl || order.media.videoPosterUrl,
+  };
 
-    const orderStage = deriveOrderStage({
-      businessStatus,
-      reviewStatus: order.reviewStatus,
-      fulfillmentStatus: order.fulfillmentStatus,
-      cancelledAt: order.cancelledAt,
-      closedAt: order.closedAt,
-    });
-    const edit = computeEditability({
-      fulfillmentStatus: order.fulfillmentStatus,
-      cancelledAt: order.cancelledAt,
-      closedAt: order.closedAt,
-      orderStage,
-      businessStatus: normalizeBusinessStatus(businessStatus),
-      versionCount,
-    });
+  const orderStage = deriveOrderStage({
+    businessStatus,
+    reviewStatus: order.reviewStatus,
+    fulfillmentStatus: order.fulfillmentStatus,
+    cancelledAt: order.cancelledAt,
+    closedAt: order.closedAt,
+  });
+  const edit = computeEditability({
+    fulfillmentStatus: order.fulfillmentStatus,
+    cancelledAt: order.cancelledAt,
+    closedAt: order.closedAt,
+    orderStage,
+    businessStatus: normalizeBusinessStatus(businessStatus),
+    versionCount,
+  });
 
-    return {
-      ...order,
-      businessStatus,
-      versionCount,
-      modificationCount: json.modificationCount ?? 0,
-      orderStage,
-      media,
-      artworkVersions: artworkVersions.length
-        ? artworkVersions
-        : order.artworkVersions,
-      modificationNotes: latestRequest?.notes?.length
-        ? latestRequest.notes
-        : order.modificationNotes,
-      canReview: edit.canReview,
-      canModify: edit.canModify,
-      canEditGift: edit.canEditGift,
-      canEditShipping: edit.canEditShipping,
-      editBlockedReason: edit.editBlockedReason,
-    };
-  } catch (err) {
-    console.error("[orders] enrichOrderFromPetApp failed", order.id, err);
-    return order;
-  }
+  return {
+    ...order,
+    businessStatus,
+    versionCount,
+    modificationCount: history.modificationCount ?? 0,
+    orderStage,
+    media,
+    artworkVersions: artworkVersions.length
+      ? artworkVersions
+      : order.artworkVersions,
+    modificationNotes: latestRequest?.notes?.length
+      ? latestRequest.notes
+      : order.modificationNotes,
+    canReview: edit.canReview,
+    canModify: edit.canModify,
+    canEditGift: edit.canEditGift,
+    canEditShipping: edit.canEditShipping,
+    editBlockedReason: edit.editBlockedReason,
+  };
 }
 
 export async function loadWorkspace(
@@ -597,10 +623,13 @@ export async function loadWorkspace(
   };
 
   const baseOrders = (customer.orders?.nodes || []).map(mapOrder);
-  const orders = await Promise.all(
-    baseOrders.map((order) =>
-      enrichOrderFromPetApp(order, shop, mappedCustomer.id),
-    ),
+  const histories = await fetchPortraitHistories(
+    baseOrders,
+    shop,
+    mappedCustomer.id,
+  );
+  const orders = baseOrders.map((order) =>
+    applyPortraitHistory(order, histories[order.id]),
   );
   return { customer: mappedCustomer, orders };
 }

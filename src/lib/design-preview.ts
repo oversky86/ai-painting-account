@@ -145,6 +145,7 @@ export function createDesignPreviewOrder(stage: OrderStage, hasVersionHistory = 
     shippingAddress: designPreviewCustomer.defaultAddress,
     media: {
       paintingUrl: "/viewbrush-order-preview.webp",
+      aiPreviewUrl: "/viewbrush-order-reference.webp",
       photoUrl: "/viewbrush-order-reference.webp",
       videoUrl: "/viewbrush-studio-preview.mp4",
       videoPosterUrl: "/viewbrush-studio-video-poster.webp",

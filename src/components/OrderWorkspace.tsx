@@ -396,7 +396,7 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
   const [asset, setAsset] = useState<"final" | "reference" | "video">("final");
   const [fullScreen, setFullScreen] = useState(false);
   const image = asset === "reference"
-    ? order.media.photoUrl || artworkUrl(order)
+    ? order.media.aiPreviewUrl || artworkUrl(order)
     : asset === "video"
       ? order.media.videoPosterUrl || artworkUrl(order)
       : artworkUrl(order);
@@ -508,7 +508,7 @@ function ShippedPanel({ order }: { order: AccountOrder }) {
 function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selected: "final" | "reference" | "video"; onSelect: (value: "final" | "reference" | "video") => void }) {
   const rows = [
     { id: "final" as const, label: "Final Portrait", image: artworkUrl(order) },
-    { id: "reference" as const, label: "AI Reference", image: order.media.photoUrl || artworkUrl(order) },
+    { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
     { id: "video" as const, label: "Studio Video", image: order.media.videoPosterUrl || artworkUrl(order), video: true },
   ];
   return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block h-[72px] overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={18} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="block truncate px-2 py-2.5 text-[13px] font-medium">{row.label}</span></button>)}</div>;

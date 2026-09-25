@@ -35,7 +35,10 @@ export type CustomerSummary = {
 };
 
 export type OrderLineMedia = {
+  /** Current artwork: the latest studio version once one exists, else the AI preview. */
   paintingUrl?: string;
+  /** AI preview generated at checkout; kept after studio versions replace `paintingUrl`. */
+  aiPreviewUrl?: string;
   photoUrl?: string;
   style?: string;
   keywords?: string;
