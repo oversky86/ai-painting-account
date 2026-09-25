@@ -1,4 +1,9 @@
 import type { OrderStage } from "./types";
+import type { BusinessStatus } from "./business-status";
+import {
+  canRequestModification,
+  normalizeBusinessStatus,
+} from "./business-status";
 
 /** Exact copy from ViewBrush Account.tsx getOrderStageCopy */
 export function getOrderStageCopy(stage: OrderStage) {
@@ -10,7 +15,7 @@ export function getOrderStageCopy(stage: OrderStage) {
       currentDescription: string;
       nextDescription: string;
     }
-    > = {
+  > = {
     artwork: {
       current: "Artwork in Progress",
       next: "Portrait Review",
@@ -75,7 +80,25 @@ export function getOrderStatusBadgeClasses(orderStage: OrderStage) {
   return `${baseClasses} border-[#DCCFBC] bg-[#F7F0E6] text-[#5F564B]`;
 }
 
+export function businessStatusToStage(
+  businessStatus: string | null | undefined,
+  fulfillmentStatus: string | null,
+): OrderStage {
+  const status = normalizeBusinessStatus(businessStatus);
+  const fulfillment = (fulfillmentStatus || "").toUpperCase();
+
+  if (status === "shipped" || fulfillment === "FULFILLED") {
+    return fulfillment === "FULFILLED" ? "shipping" : "shipping";
+  }
+  if (status === "prepare_shipment") return "framing";
+  if (status === "supplier_modification") return "revision";
+  if (status === "portrait_review") return "review";
+  return "artwork";
+}
+
+/** @deprecated Prefer businessStatusToStage — kept for legacy review_status rows */
 export function deriveOrderStage(input: {
+  businessStatus?: string | null;
   reviewStatus: string | null;
   fulfillmentStatus: string | null;
   cancelledAt: string | null;
@@ -99,6 +122,12 @@ export function deriveOrderStage(input: {
   ) {
     return "shipping";
   }
+
+  if (input.businessStatus) {
+    return businessStatusToStage(input.businessStatus, input.fulfillmentStatus);
+  }
+
+  // Legacy fallback from custom.review_status
   if (input.reviewStatus === "modify_requested") return "revision";
   if (
     input.reviewStatus === "ready_for_review" ||
@@ -119,6 +148,8 @@ export function computeEditability(input: {
   cancelledAt: string | null;
   closedAt: string | null;
   orderStage: OrderStage;
+  businessStatus?: BusinessStatus | string | null;
+  versionCount?: number;
 }) {
   const fulfillment = (input.fulfillmentStatus || "").toUpperCase();
   const locked =
@@ -137,15 +168,30 @@ export function computeEditability(input: {
   else if (fulfillment === "IN_TRANSIT" || fulfillment === "OUT_FOR_DELIVERY")
     reason = "This order is already in transit.";
 
+  const business = normalizeBusinessStatus(input.businessStatus);
+  const versionCount = input.versionCount ?? 0;
+  const canModify =
+    input.orderStage === "review" &&
+    business === "portrait_review" &&
+    canRequestModification(versionCount) &&
+    !input.cancelledAt &&
+    !input.closedAt;
+
   const canReview =
     input.orderStage === "review" &&
+    business === "portrait_review" &&
     !input.cancelledAt &&
     !input.closedAt;
 
   return {
     canReview,
+    canModify,
     canEditGift: !locked,
-    canEditShipping: !locked && (input.orderStage === "shipping" || input.orderStage === "complete" || input.orderStage === "framing"),
+    canEditShipping:
+      !locked &&
+      (input.orderStage === "shipping" ||
+        input.orderStage === "complete" ||
+        input.orderStage === "framing"),
     editBlockedReason: reason,
   };
 }

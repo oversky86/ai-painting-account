@@ -58,11 +58,24 @@ const stageReviewStatus: Record<OrderStage, string> = {
 export function createDesignPreviewOrder(stage: OrderStage, hasVersionHistory = false): AccountOrder {
   const fulfillmentStatus =
     stage === "shipping" || stage === "complete" ? "FULFILLED" : "UNFULFILLED";
+  const businessStatus =
+    stage === "artwork"
+      ? "order_placed"
+      : stage === "review"
+        ? "portrait_review"
+        : stage === "revision"
+          ? "supplier_modification"
+          : stage === "framing"
+            ? "prepare_shipment"
+            : "shipped";
+  const versionCount = stage === "artwork" ? 0 : stage === "review" || stage === "revision" ? 1 : 3;
   const editability = computeEditability({
     fulfillmentStatus,
     cancelledAt: null,
     closedAt: null,
     orderStage: stage,
+    businessStatus,
+    versionCount,
   });
 
   return {
@@ -78,7 +91,10 @@ export function createDesignPreviewOrder(stage: OrderStage, hasVersionHistory = 
     currencyCode: "USD",
     deliveryLabel: "Standard",
     orderStage: stage,
+    businessStatus,
     reviewStatus: stageReviewStatus[stage],
+    versionCount,
+    modificationCount: stage === "revision" ? 1 : 0,
     modificationNotes: stage === "revision" ? previewNotes.slice(0, 3) : [],
     artworkVersions: hasVersionHistory ? [
       {

@@ -104,7 +104,10 @@ export type AccountOrder = {
   currencyCode: string;
   deliveryLabel: string;
   orderStage: OrderStage;
+  businessStatus: string | null;
   reviewStatus: string | null;
+  versionCount: number;
+  modificationCount: number;
   modificationNotes: ModificationNote[];
   artworkVersions: ArtworkVersion[];
   tracking: TrackingDetails | null;
@@ -115,6 +118,7 @@ export type AccountOrder = {
   pastCharges: PaymentChargeRow[];
   upcomingCharges: UpcomingChargeRow[];
   canReview: boolean;
+  canModify: boolean;
   canEditGift: boolean;
   canEditShipping: boolean;
   editBlockedReason: string | null;

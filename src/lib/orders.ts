@@ -16,6 +16,8 @@ import type {
 } from "./types";
 import { caGraphql } from "./shopify-ca";
 import type { ShopConfig } from "./shops";
+import { postSignedWrite } from "./hmac";
+import { normalizeBusinessStatus } from "./business-status";
 
 const CUSTOMER_ORDERS_QUERY = `
 query AccountWorkspace {
@@ -69,6 +71,9 @@ query AccountWorkspace {
             title
             customAttributes { key value }
           }
+        }
+        businessStatus: metafield(namespace: "custom", key: "business_status") {
+          value
         }
         reviewStatus: metafield(namespace: "custom", key: "review_status") {
           value
@@ -151,6 +156,7 @@ type CaOrder = {
       customAttributes?: Array<{ key: string; value?: string | null }> | null;
     }>;
   } | null;
+  businessStatus?: { value?: string | null } | null;
   reviewStatus?: { value?: string | null } | null;
   giftMessage?: { value?: string | null } | null;
   modificationRequest?: { value?: string | null } | null;
@@ -181,7 +187,13 @@ function attr(
   attrs: Array<{ key: string; value?: string | null }> | null | undefined,
   key: string,
 ) {
-  return attrs?.find((a) => a.key === key)?.value || undefined;
+  // Prefer hidden `_key` (checkout-hidden), fall back to legacy visible key.
+  const hidden = `_${key}`;
+  return (
+    attrs?.find((a) => a.key === hidden)?.value ||
+    attrs?.find((a) => a.key === key)?.value ||
+    undefined
+  );
 }
 
 function collectMedia(order: CaOrder): OrderLineMedia {
@@ -386,9 +398,11 @@ function fulfillmentStatus(order: CaOrder): string | null {
 
 function mapOrder(order: CaOrder): AccountOrder {
   const media = collectMedia(order);
+  const businessStatus = order.businessStatus?.value || null;
   const reviewStatus = order.reviewStatus?.value || null;
   const fulfillment = fulfillmentStatus(order);
   const orderStage = deriveOrderStage({
+    businessStatus,
     reviewStatus,
     fulfillmentStatus: fulfillment,
     cancelledAt: null,
@@ -399,6 +413,8 @@ function mapOrder(order: CaOrder): AccountOrder {
     cancelledAt: null,
     closedAt: null,
     orderStage,
+    businessStatus,
+    versionCount: 0,
   });
   const currency = order.totalPrice?.currencyCode || "USD";
   const modificationNotes = parseModificationNotes(
@@ -422,7 +438,10 @@ function mapOrder(order: CaOrder): AccountOrder {
     currencyCode: currency,
     deliveryLabel: "Standard",
     orderStage,
+    businessStatus,
     reviewStatus,
+    versionCount: 0,
+    modificationCount: 0,
     modificationNotes,
     artworkVersions,
     tracking: collectTracking(order),
@@ -436,10 +455,116 @@ function mapOrder(order: CaOrder): AccountOrder {
     pastCharges: mapPastCharges(order),
     upcomingCharges: mapUpcoming(order),
     canReview: edit.canReview,
+    canModify: edit.canModify,
     canEditGift: edit.canEditGift,
     canEditShipping: edit.canEditShipping,
     editBlockedReason: edit.editBlockedReason,
   };
+}
+
+async function enrichOrderFromPetApp(
+  order: AccountOrder,
+  shop: ShopConfig,
+  customerId: string,
+): Promise<AccountOrder> {
+  try {
+    const res = await postSignedWrite("/api/account/order-write", {
+      type: "portrait_history",
+      shop: shop.storeDomain,
+      orderId: order.id,
+      customerId,
+    });
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      businessStatus?: string;
+      versionCount?: number;
+      modificationCount?: number;
+      versions?: Array<{
+        versionNumber: number;
+        imageUrl?: string | null;
+        videoUrl?: string | null;
+        createdAt?: string;
+      }>;
+      modificationRequests?: Array<{
+        againstVersion: number;
+        createdAt?: string;
+        notes: ModificationNote[];
+      }>;
+    } | null;
+    if (!res.ok || !json?.ok) return order;
+
+    const businessStatus =
+      json.businessStatus || order.businessStatus || "order_placed";
+    const versionCount = json.versionCount ?? 0;
+    const latestVersion = json.versions?.[json.versions.length - 1];
+    const latestRequest =
+      json.modificationRequests?.[json.modificationRequests.length - 1];
+
+    const artworkVersions: ArtworkVersion[] = (json.versions || []).map(
+      (v) => {
+        const matching = json.modificationRequests?.find(
+          (r) => r.againstVersion === v.versionNumber,
+        );
+        return {
+          id: `v${v.versionNumber}`,
+          label: `VERSION ${String(v.versionNumber).padStart(2, "0")}`,
+          title: `Portrait version ${v.versionNumber}`,
+          subtitle: matching
+            ? `${matching.notes.length} modification notes`
+            : "Studio delivery",
+          imageUrl: v.imageUrl || undefined,
+          approved: false,
+          notes: matching?.notes || [],
+        };
+      },
+    );
+
+    const media = {
+      ...order.media,
+      paintingUrl: latestVersion?.imageUrl || order.media.paintingUrl,
+      videoUrl: latestVersion?.videoUrl || order.media.videoUrl,
+      videoPosterUrl: latestVersion?.imageUrl || order.media.videoPosterUrl,
+    };
+
+    const orderStage = deriveOrderStage({
+      businessStatus,
+      reviewStatus: order.reviewStatus,
+      fulfillmentStatus: order.fulfillmentStatus,
+      cancelledAt: order.cancelledAt,
+      closedAt: order.closedAt,
+    });
+    const edit = computeEditability({
+      fulfillmentStatus: order.fulfillmentStatus,
+      cancelledAt: order.cancelledAt,
+      closedAt: order.closedAt,
+      orderStage,
+      businessStatus: normalizeBusinessStatus(businessStatus),
+      versionCount,
+    });
+
+    return {
+      ...order,
+      businessStatus,
+      versionCount,
+      modificationCount: json.modificationCount ?? 0,
+      orderStage,
+      media,
+      artworkVersions: artworkVersions.length
+        ? artworkVersions
+        : order.artworkVersions,
+      modificationNotes: latestRequest?.notes?.length
+        ? latestRequest.notes
+        : order.modificationNotes,
+      canReview: edit.canReview,
+      canModify: edit.canModify,
+      canEditGift: edit.canEditGift,
+      canEditShipping: edit.canEditShipping,
+      editBlockedReason: edit.editBlockedReason,
+    };
+  } catch (err) {
+    console.error("[orders] enrichOrderFromPetApp failed", order.id, err);
+    return order;
+  }
 }
 
 export async function loadWorkspace(
@@ -471,6 +596,11 @@ export async function loadWorkspace(
       .filter(Boolean) as AddressRecord[],
   };
 
-  const orders = (customer.orders?.nodes || []).map(mapOrder);
+  const baseOrders = (customer.orders?.nodes || []).map(mapOrder);
+  const orders = await Promise.all(
+    baseOrders.map((order) =>
+      enrichOrderFromPetApp(order, shop, mappedCustomer.id),
+    ),
+  );
   return { customer: mappedCustomer, orders };
 }

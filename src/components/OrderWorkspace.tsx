@@ -39,6 +39,7 @@ type OrderWorkspaceProps = {
     order: AccountOrder,
     action: ReviewAction,
     note?: string,
+    notes?: ModificationNote[],
   ) => Promise<void>;
   onSaveGift: (
     order: AccountOrder,
@@ -279,7 +280,7 @@ function OrderDetail({
           setBusy(true);
           setError("");
           try {
-            await onReview(order, "modify", JSON.stringify({ notes }));
+            await onReview(order, "modify", JSON.stringify({ notes }), notes);
             setMode("detail");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } catch (cause) {
@@ -416,7 +417,13 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
             <p className="mt-3 text-sm leading-[22px] text-[#6C6054]">Approve the portrait for shipment, or open the modification page to mark requested changes.</p>
             <div className="mt-7 grid gap-3 lg:mt-[169px]">
               <button type="button" onClick={onApprove} className={buttonPrimary}>Approve Portrait</button>
-              <button type="button" onClick={onModify} className={buttonSecondary}>Ask for Modification</button>
+              {order.canModify ? (
+                <button type="button" onClick={onModify} className={buttonSecondary}>Ask for Modification</button>
+              ) : (
+                <p className="text-sm leading-[22px] text-[#6C6054]">
+                  Modification requests are no longer available for this portrait. Please approve to continue.
+                </p>
+              )}
             </div>
           </div>
         </aside>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth";
 import { assertCsrf } from "@/lib/session";
 import { postSignedWrite } from "@/lib/hmac";
+import type { ModificationNote } from "@/lib/types";
 
 export async function POST(
   request: NextRequest,
@@ -21,6 +22,7 @@ export async function POST(
   const body = (await request.json()) as {
     action?: "approve" | "modify";
     note?: string;
+    notes?: ModificationNote[];
     orderName?: string;
   };
 
@@ -31,12 +33,23 @@ export async function POST(
     );
   }
 
+  let notes = Array.isArray(body.notes) ? body.notes : [];
+  if (!notes.length && body.note) {
+    try {
+      const parsed = JSON.parse(body.note) as { notes?: ModificationNote[] };
+      if (Array.isArray(parsed.notes)) notes = parsed.notes;
+    } catch {
+      /* plain text note handled by pet app */
+    }
+  }
+
   const res = await postSignedWrite("/api/account/order-write", {
     type: "review",
     shop: session.shopDomain,
     orderId: decodeURIComponent(id),
     customerId: session.customerId,
     action: body.action,
+    notes,
     note: body.note || "",
     orderName: body.orderName || "",
   });

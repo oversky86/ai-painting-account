@@ -180,20 +180,43 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
     return json;
   }
 
-  const handleReview = async (order: AccountOrder, action: "approve" | "modify", note?: string) => {
+  const handleReview = async (
+    order: AccountOrder,
+    action: "approve" | "modify",
+    note?: string,
+    notes?: ModificationNote[],
+  ) => {
     if (designPreview) {
-      setOrders((current) => current.map((row) => row.id === order.id ? {
-        ...row,
-        orderStage: action === "approve" ? "framing" : "revision",
-        reviewStatus: action === "approve" ? "approved" : "modify_requested",
-        modificationNotes: action === "modify" ? parsedNotes(note) : row.modificationNotes,
-        canReview: false,
-      } : row));
+      setOrders((current) =>
+        current.map((row) =>
+          row.id === order.id
+            ? {
+                ...row,
+                orderStage: action === "approve" ? "framing" : "revision",
+                businessStatus:
+                  action === "approve"
+                    ? "prepare_shipment"
+                    : "supplier_modification",
+                reviewStatus:
+                  action === "approve" ? "approved" : "modify_requested",
+                modificationNotes:
+                  action === "modify"
+                    ? notes?.length
+                      ? notes
+                      : parsedNotes(note)
+                    : row.modificationNotes,
+                canReview: false,
+                canModify: false,
+              }
+            : row,
+        ),
+      );
       return;
     }
     await apiPost(`/api/orders/${encodeURIComponent(order.id)}/review`, {
       action,
       note: note || "",
+      notes: notes || [],
       orderName: order.name,
     });
     await reload();
