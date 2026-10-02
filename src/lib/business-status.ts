@@ -8,7 +8,6 @@ export const BUSINESS_STATUSES = [
 
 export type BusinessStatus = (typeof BUSINESS_STATUSES)[number];
 
-export const MAX_PORTRAIT_VERSIONS = 3;
 
 export function isBusinessStatus(value: unknown): value is BusinessStatus {
   return (
@@ -24,7 +23,7 @@ export function normalizeBusinessStatus(
   return "order_placed";
 }
 
-/** Customer may request modifications only against versions 1 and 2. */
+/** A modification needs an uploaded portrait. There is no version cap. */
 export function canRequestModification(versionCount: number): boolean {
-  return versionCount > 0 && versionCount < MAX_PORTRAIT_VERSIONS;
+  return versionCount > 0;
 }
