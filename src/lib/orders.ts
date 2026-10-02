@@ -39,6 +39,7 @@ query AccountWorkspace {
         id
         name
         processedAt
+        cancelledAt
         financialStatus
         fulfillments(first: 5) {
           nodes {
@@ -121,6 +122,7 @@ type CaOrder = {
   id: string;
   name: string;
   processedAt?: string | null;
+  cancelledAt?: string | null;
   financialStatus?: string | null;
   fulfillments?: {
     nodes: Array<{
@@ -406,16 +408,18 @@ function mapOrder(order: CaOrder): AccountOrder {
   const businessStatus = order.businessStatus?.value || null;
   const reviewStatus = order.reviewStatus?.value || null;
   const fulfillment = fulfillmentStatus(order);
+  const cancelledAt = order.cancelledAt || null;
   const orderStage = deriveOrderStage({
     businessStatus,
     reviewStatus,
     fulfillmentStatus: fulfillment,
-    cancelledAt: null,
+    cancelledAt,
     closedAt: null,
   });
   const edit = computeEditability({
     fulfillmentStatus: fulfillment,
-    cancelledAt: null,
+    financialStatus: order.financialStatus || null,
+    cancelledAt,
     closedAt: null,
     orderStage,
     businessStatus,
@@ -437,7 +441,7 @@ function mapOrder(order: CaOrder): AccountOrder {
     email: null,
     financialStatus: order.financialStatus || null,
     fulfillmentStatus: fulfillment,
-    cancelledAt: null,
+    cancelledAt,
     closedAt: null,
     total: money(order.totalPrice?.amount, currency),
     currencyCode: currency,
@@ -565,6 +569,7 @@ function applyPortraitHistory(
   });
   const edit = computeEditability({
     fulfillmentStatus: order.fulfillmentStatus,
+    financialStatus: order.financialStatus,
     cancelledAt: order.cancelledAt,
     closedAt: order.closedAt,
     orderStage,
