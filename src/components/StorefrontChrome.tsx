@@ -8,6 +8,7 @@ type StorefrontChromeProps = {
   storefrontUrl: string;
   createUrl: string;
   cartUrl: string;
+  cached?: boolean;
 };
 
 const navigation = [
@@ -25,6 +26,7 @@ export function StorefrontHeader({
   storefrontUrl,
   createUrl,
   cartUrl,
+  cached = false,
 }: StorefrontChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -100,7 +102,7 @@ export function StorefrontHeader({
             href={createUrl}
             className="storefront-header__cta inline-flex items-center justify-center whitespace-nowrap rounded-[8px] bg-[#31271F] font-normal text-[#FBF8F3] transition-colors hover:bg-[#241C16]"
           >
-            Create Artwork
+            {cached ? "Resume" : "Create Artwork"}
           </a>
           <button
             type="button"

@@ -1,3 +1,5 @@
+import { STOREFRONT_CREATE_PATH } from "./storefront-paths";
+
 export type ShopConfig = {
   /** myshopify.com domain (canonical key) */
   storeDomain: string;
@@ -119,7 +121,7 @@ export function publicConfigFor(shop: ShopConfig) {
     storefrontUrl: shop.storefrontUrl,
     nativeAccountUrl: shop.nativeAccountUrl,
     nativeAccountProfileUrl: shop.nativeAccountProfileUrl,
-    createPath: "/products/custom-oil-painting",
+    createPath: STOREFRONT_CREATE_PATH,
     cartPath: "/cart",
     storeDomain: shop.storeDomain,
   };
