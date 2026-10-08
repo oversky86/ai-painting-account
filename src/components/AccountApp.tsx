@@ -240,7 +240,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FBF8F3] text-[#2D241B]">
-      <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={createUrl} cartUrl={cartUrl} />
+      <StorefrontHeader storefrontUrl={storefrontUrl} cartUrl={cartUrl} />
       <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 pt-[88px] sm:px-6 lg:px-10 ${usesAccountFooter ? "pb-12" : "pb-[120px]"} ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}>
         {loading ? <p className="min-h-[240px] text-sm text-[#5F564B]" aria-live="polite">Loading your workspace…</p> : null}
         {!loading && (error || !customer) ? (

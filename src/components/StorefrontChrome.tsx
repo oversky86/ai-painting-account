@@ -6,15 +6,14 @@ import { useEffect, useState } from "react";
 
 type StorefrontChromeProps = {
   storefrontUrl: string;
-  createUrl: string;
   cartUrl: string;
 };
 
 const navigation = [
-  { label: "Home", path: "" },
   { label: "How It Works", path: "/pages/how-it-works" },
+  { label: "Materials", path: "/pages/materials" },
   { label: "FAQ", path: "/pages/faq" },
-  { label: "About ViewBrush", path: "/pages/about" },
+  { label: "Contact Us", path: "/pages/contact" },
 ];
 
 function storefrontHref(origin: string, path: string) {
@@ -23,7 +22,6 @@ function storefrontHref(origin: string, path: string) {
 
 export function StorefrontHeader({
   storefrontUrl,
-  createUrl,
   cartUrl,
 }: StorefrontChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,10 +41,10 @@ export function StorefrontHeader({
   }, [menuOpen]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 h-[65px] border-b border-[#D8CDBB] bg-[#F6F0E7]/[0.92] backdrop-blur-[12px]">
+    <header className="fixed inset-x-0 top-0 z-[90] h-16 border-b border-[#D8CDBB] bg-[#F6F0E7]/[0.92] backdrop-blur-[12px] transition-colors">
       <nav
         aria-label="Primary"
-        className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10"
+        className="relative z-[100] mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10"
       >
         <div className="flex min-w-0 flex-1 items-center">
           <a
@@ -96,12 +94,6 @@ export function StorefrontHeader({
           >
             <ShoppingBag size={18} strokeWidth={2} aria-hidden="true" />
           </a>
-          <a
-            href={createUrl}
-            className="storefront-header__cta inline-flex items-center justify-center whitespace-nowrap rounded-[8px] bg-[#31271F] font-normal text-[#FBF8F3] transition-colors hover:bg-[#241C16]"
-          >
-            Create Artwork
-          </a>
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
@@ -115,10 +107,10 @@ export function StorefrontHeader({
       </nav>
 
       {menuOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="absolute inset-x-0 top-16 z-[80] h-[calc(100dvh-64px)] overflow-hidden bg-[#F6F0E7] lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 border-0 bg-[#2D241B]/30 p-0 backdrop-blur-[2px]"
+            className="absolute inset-0 border-0 bg-[#F6F0E7] p-0"
             onClick={() => setMenuOpen(false)}
             aria-label="Close menu overlay"
           />
@@ -126,25 +118,27 @@ export function StorefrontHeader({
             role="dialog"
             aria-modal="true"
             aria-label="Navigation menu"
-            className="absolute left-4 right-4 top-20 overflow-hidden rounded-[12px] border border-[#DCCFBC] bg-[#FBF8F3] shadow-[0_28px_60px_rgba(43,31,21,0.18)]"
+            className="storefront-mobile-menu absolute inset-0 overflow-y-auto bg-transparent px-4 pb-10 pt-4 sm:px-6"
           >
-            <p className="border-b border-[#E8DECF] p-4 text-xs font-bold uppercase text-[#8F816C]">Menu</p>
-            <div className="flex flex-col p-2">
+            <div className="m-0 border-b border-[#E8DECF] p-4">
+              <p className="text-xs font-bold uppercase text-[#8F816C]">Menu</p>
+            </div>
+            <div className="flex flex-col gap-1 py-3">
               {navigation.map((item) => (
                 <a
                   key={item.label}
                   href={storefrontHref(storefrontUrl, item.path)}
-                  className="flex min-h-11 items-center rounded-[8px] px-3 text-base font-medium text-[#69523F] hover:bg-[#F3EBDE] hover:text-[#31271F]"
+                  className="flex min-h-[52px] items-center justify-between rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]"
                 >
                   {item.label}
                 </a>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-2 border-t border-[#E8DECF] p-3">
-              <a href="/account" className="flex min-h-11 items-center gap-2 rounded-[8px] px-3 text-sm font-medium hover:bg-[#F3EBDE]">
+            <div className="grid gap-1 border-t border-[#E8DECF] py-3">
+              <a href="/account" aria-current="page" className="flex min-h-[52px] items-center gap-3 rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]">
                 <User size={16} aria-hidden="true" /> Account
               </a>
-              <a href={cartUrl} className="flex min-h-11 items-center gap-2 rounded-[8px] px-3 text-sm font-medium hover:bg-[#F3EBDE]">
+              <a href={cartUrl} className="flex min-h-[52px] items-center gap-3 rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]">
                 <ShoppingBag size={16} aria-hidden="true" /> Cart
               </a>
             </div>
