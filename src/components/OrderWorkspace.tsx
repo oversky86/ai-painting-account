@@ -30,6 +30,7 @@ import type {
 } from "@/lib/types";
 
 type ReviewAction = "approve" | "modify";
+type MediaAsset = "final" | "reference" | "video";
 
 type OrderWorkspaceProps = {
   orders: AccountOrder[];
@@ -189,8 +190,8 @@ function OrderListCard({
   return (
     <>
       <article className="rounded-[8px] border border-[#DCCFBC] bg-white/85 p-4 shadow-[0_18px_38px_rgba(43,31,21,0.05)] lg:grid lg:min-h-[196px] lg:grid-cols-[148px_minmax(0,1fr)_260px] lg:items-center lg:gap-5 lg:p-6">
-        <div className="grid grid-cols-[108px_minmax(0,1fr)] gap-6 lg:block">
-          <div className="h-[108px] w-[108px] overflow-hidden rounded-[6px] border border-[#DCCFBC] bg-[#F3EBDE] lg:h-[148px] lg:w-[148px] lg:rounded-[8px]">
+        <div className="grid grid-cols-[116px_minmax(0,1fr)] gap-6 lg:block">
+          <div className="h-[116px] w-[116px] overflow-hidden rounded-[6px] border border-[#DCCFBC] bg-[#F3EBDE] lg:h-[148px] lg:w-[148px] lg:rounded-[8px]">
             {image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image} alt={`${order.media.conceptTitle || "Custom"} portrait`} width={148} height={148} className="h-full w-full object-cover" />
@@ -434,7 +435,10 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
 }
 
 function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: () => void }) {
-  const image = artworkUrl(order);
+  const [asset, setAsset] = useState<MediaAsset>("final");
+  const [fullScreen, setFullScreen] = useState(false);
+  const image = selectedMediaImage(order, asset);
+  const isVideo = asset === "video" && Boolean(order.media.videoUrl);
   const hasVersionHistory =
     order.modificationNotes.length > 0 ||
     order.artworkVersions.length > 1 ||
@@ -449,12 +453,12 @@ function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: (
       <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:p-6">
         <div><h3 className="text-[22px] font-bold">Your Portrait is Approved.</h3><p className="mt-2 text-sm text-[#6C6054]">Artwork changes are no longer available at this stage.</p></div>
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,772px)_340px] lg:gap-10">
-          <PreviewSurface image={image} />
+          <PreviewSurface image={image} video={isVideo ? order.media.videoUrl : undefined} onExpand={() => setFullScreen(true)} />
           <aside className="flex flex-col">
-            <MediaTabs order={order} selected="final" onSelect={() => undefined} />
+            <MediaTabs order={order} selected={asset} onSelect={setAsset} />
             <div className="mt-6 flex flex-1 flex-col border-t border-[#E7DCCC] pt-6">
               <div className="mt-auto grid gap-3">
-                <button type="button" disabled className={`${buttonPrimary} w-full opacity-35`}>Approved</button>
+                <button type="button" disabled className="inline-flex min-h-12 w-full items-center justify-center rounded-[8px] bg-[#AFA8A2] px-5 text-[15px] font-semibold text-white">Approved</button>
                 {hasVersionHistory ? (
                   <button type="button" onClick={onHistory} className={`${buttonSecondary} w-full gap-2`}>
                     <History size={18} aria-hidden="true" />
@@ -466,6 +470,7 @@ function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: (
           </aside>
         </div>
       </article>
+      {fullScreen && image ? <FullScreenPreview image={image} video={isVideo ? order.media.videoUrl : undefined} onClose={() => setFullScreen(false)} /> : null}
     </>
   );
 }
@@ -476,8 +481,8 @@ function RevisionPanel({ order }: { order: AccountOrder }) {
     <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:p-6">
       <h3 className="text-xl font-bold">Submitted modification request</h3>
       <p className="mt-3 max-w-3xl text-sm leading-[22px] text-[#6C6054]">The artist is revising the portrait based on your notes. You will receive an email when the updated artwork is ready to review.</p>
-      <div className="mt-5 grid gap-6 border-t border-[#E7DCCC] pt-5 lg:grid-cols-[404px_minmax(0,1fr)]">
-        <AnnotatedImage src={artworkUrl(order)} notes={notes} />
+      <div className="mt-5 grid gap-6 border-t border-[#E7DCCC] pt-5 lg:grid-cols-[minmax(0,772px)_minmax(0,1fr)] lg:gap-10">
+        <AnnotatedImage src={artworkUrl(order)} notes={notes} fit="review" />
         <div><h4 className="text-base font-bold">Modification Request</h4><ol className="mt-5 grid gap-3 text-sm text-[#6C6054]">{notes.map((note, index) => <li key={note.id}>#{index + 1} {note.text}</li>)}</ol></div>
       </div>
     </article>
@@ -505,7 +510,13 @@ function ShippedPanel({ order }: { order: AccountOrder }) {
   );
 }
 
-function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selected: "final" | "reference" | "video"; onSelect: (value: "final" | "reference" | "video") => void }) {
+function selectedMediaImage(order: AccountOrder, asset: MediaAsset) {
+  if (asset === "reference") return order.media.aiPreviewUrl || artworkUrl(order);
+  if (asset === "video") return order.media.videoPosterUrl || artworkUrl(order);
+  return artworkUrl(order);
+}
+
+function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selected: MediaAsset; onSelect: (value: MediaAsset) => void }) {
   const rows = [
     { id: "final" as const, label: "Final Portrait", image: artworkUrl(order) },
     { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
@@ -897,7 +908,30 @@ function SelectionOverlays({ notes, activeId }: { notes: ModificationNote[]; act
   return <>{notes.map((note,index) => <span key={note.id} className={`pointer-events-none absolute border-2 ${activeId === note.id ? "border-[#D6534C] bg-[#D6534C]/12" : "border-[#3B9463] bg-[#3B9463]/10"}`} style={{ left:`${note.selection.x}%`, top:`${note.selection.y}%`, width:`${note.selection.width}%`, height:`${note.selection.height}%` }}><span className="absolute right-[-11px] top-1/2 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-white bg-[#D6534C] text-[11px] font-bold text-white">{index+1}</span></span>)}</>;
 }
 
-function AnnotatedImage({ src, notes, activeId, className = "aspect-square" }: { src: string; notes: ModificationNote[]; activeId?: string; className?: string }) {
+function AnnotatedImage({
+  src,
+  notes,
+  activeId,
+  className = "aspect-square",
+  fit = "cover",
+}: {
+  src: string;
+  notes: ModificationNote[];
+  activeId?: string;
+  className?: string;
+  fit?: "cover" | "review";
+}) {
+  if (fit === "review") {
+    return (
+      <div className={`relative flex aspect-square min-h-[326px] items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:aspect-auto lg:h-[506px] lg:p-5 ${className}`}>
+        <div className="relative aspect-[799/1200] h-full max-h-full max-w-full overflow-hidden">
+          {src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-contain" /> : null}
+          <SelectionOverlays notes={notes} activeId={activeId} />
+        </div>
+      </div>
+    );
+  }
+
   return <div className={`relative overflow-hidden rounded-[6px] bg-[#EFE8DD] ${className}`}>{src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-cover" /> : null}<SelectionOverlays notes={notes} activeId={activeId} /></div>;
 }
 
@@ -1066,12 +1100,11 @@ function GiftMessageDialog({
   onClose: () => void;
   onSave: (message: GiftMessage) => Promise<void>;
 }) {
-  const [title, setTitle] = useState(initialMessage?.title ?? "Your Title Here");
+  const messageLimit = 240;
+  const [title, setTitle] = useState(initialMessage?.title ?? "A gift for you");
   const [sender, setSender] = useState(initialMessage?.sender ?? "");
   const [recipient, setRecipient] = useState(initialMessage?.recipient ?? "");
   const [message, setMessage] = useState(initialMessage?.message ?? "");
-  const [previewNotice, setPreviewNotice] = useState("");
-  const titleInputRef = useRef<HTMLInputElement>(null);
   const canSave = Boolean(title.trim() && sender.trim() && recipient.trim() && message.trim());
 
   useEffect(() => {
@@ -1081,7 +1114,6 @@ function GiftMessageDialog({
     };
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", closeOnEscape);
-    titleInputRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", closeOnEscape);
@@ -1089,44 +1121,55 @@ function GiftMessageDialog({
   }, [busy, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#241C16]/[0.58] px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#241C16]/[0.62] backdrop-blur-sm lg:flex lg:items-center lg:justify-center lg:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="gift-message-title"
-        className="mx-auto w-full max-w-[980px] overflow-hidden rounded-[8px] border border-[#DCCFBC] bg-[#FBF8F3] shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
+        className="mx-auto min-h-dvh w-full bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] lg:min-h-0 lg:max-h-[calc(100dvh-48px)] lg:max-w-[1040px] lg:overflow-y-auto lg:rounded-[8px] lg:border lg:border-[#DCCFBC]"
       >
-        <header className="flex items-center justify-between border-b border-[#DCCFBC] px-5 py-4">
-          <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16]">Gift Message</h2>
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:px-8 lg:py-5">
+          <div>
+            <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16] lg:text-2xl">Add a gift message</h2>
+            <p className="mt-1 text-xs text-[#776A5D] lg:text-sm">A printed card will be included with the portrait.</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="flex h-11 w-11 items-center justify-center rounded-[8px] p-2 text-[#31271F] transition-colors hover:bg-[#F3EBDE]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-[#31271F] transition-colors hover:bg-[#F3EBDE]"
             aria-label="Close gift message"
           >
-            <X size={24} aria-hidden="true" />
+            <X size={22} aria-hidden="true" />
           </button>
         </header>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[360px_minmax(0,1fr)] lg:p-8">
-          <div className="rounded-[8px] border border-[#DCCFBC] bg-white p-6 shadow-[0_16px_34px_rgba(43,31,21,0.06)]">
-            <div className="min-h-[430px] rounded-[8px] border border-[#EFE4D6] bg-[#FBF8F3] p-7 text-center">
-              <div className="mx-auto h-16 w-28 rounded-full border-t-4 border-[#D7A77C]" aria-hidden="true" />
-              <p className="mt-10 text-2xl font-semibold text-[#7A4A68]">{title || "Your Title Here"}</p>
-              <div className="mt-5 space-y-1 text-sm font-semibold text-[#4F4437]">
-                <p>To: {recipient || "Someone you love"}</p>
-                <p>From: {sender || "Someone I love"}</p>
-              </div>
-              <p className="mx-auto mt-8 max-w-[24ch] whitespace-pre-line text-sm leading-7 text-[#5F564B]">
-                {message || "This hand-painted portrait was created with love just for you."}
-              </p>
-              <p className="mt-10 text-lg font-semibold text-[#7A4A68]">ViewBrush</p>
+        <div className="grid lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
+          <aside className="border-b border-[#E0D1BD] bg-[#F2E8DB] p-5 lg:border-b-0 lg:border-r lg:p-8">
+            <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-[#776A5D]">
+              <span>Card preview</span>
+              <span className="flex items-center gap-1.5 normal-case tracking-normal text-[#8A5A68]"><span className="h-1.5 w-1.5 rounded-full bg-[#A85F70]" />Live</span>
             </div>
-          </div>
+            <div className="relative min-h-[224px] overflow-hidden rounded-[6px] border border-[#D7C5AF] bg-[#FFFCF8] px-6 py-6 shadow-[0_18px_45px_rgba(71,49,32,0.12)] lg:min-h-[456px] lg:px-9 lg:py-10">
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#8C4E5F]" aria-hidden="true" />
+              <div className="flex h-full min-h-[176px] flex-col text-center lg:min-h-[376px]">
+                <Gift className="mx-auto text-[#9A596A]" size={30} strokeWidth={1.6} aria-hidden="true" />
+                <p className="mt-3 font-serif text-[26px] leading-8 text-[#522F38] lg:mt-7 lg:text-[30px]">
+                  {title || "A gift for you"}
+                </p>
+                <p className="mx-auto mt-3 max-w-[32ch] whitespace-pre-line text-[13px] leading-5 text-[#5F564B] lg:mt-7 lg:text-sm lg:leading-7">
+                  {message || "Your personal message will appear here."}
+                </p>
+                <div className="mt-auto grid grid-cols-2 gap-4 border-t border-[#E6DAC9] pt-4 text-left text-xs lg:pt-5">
+                  <div className="min-w-0"><span className="block text-[#927F6B]">To</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{recipient || "Recipient"}</strong></div>
+                  <div className="min-w-0 text-right"><span className="block text-[#927F6B]">From</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{sender || senderPlaceholder}</strong></div>
+                </div>
+              </div>
+            </div>
+          </aside>
 
           <form
-            className="space-y-5"
+            className="space-y-5 p-5 pb-0 lg:p-8"
             onSubmit={(event) => {
               event.preventDefault();
               if (!canSave || busy) return;
@@ -1138,48 +1181,53 @@ function GiftMessageDialog({
               });
             }}
           >
+            <div>
+              <h3 className="text-xl font-semibold text-[#241C16]">Personalize the card</h3>
+              <p className="mt-1 text-sm leading-6 text-[#776A5D]">Use the preview to check exactly how your note will look.</p>
+            </div>
             <label className="block text-sm font-semibold text-[#2D241B]">
               <span className="mb-2 block">Title *</span>
-              <input ref={titleInputRef} required value={title} onChange={(event) => setTitle(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} />
+              <input required maxLength={48} value={title} onChange={(event) => setTitle(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} />
             </label>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className="block text-sm font-semibold text-[#2D241B]">
+                <span className="mb-2 block">Recipient name *</span>
+                <input required maxLength={40} value={recipient} onChange={(event) => setRecipient(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder="Their name" />
+              </label>
+              <label className="block text-sm font-semibold text-[#2D241B]">
+                <span className="mb-2 block">Your name *</span>
+                <input required maxLength={40} value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder={senderPlaceholder} />
+              </label>
+            </div>
             <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Your name *</span>
-              <input required value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} placeholder={senderPlaceholder} />
-            </label>
-            <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Recipient name *</span>
-              <input required value={recipient} onChange={(event) => setRecipient(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} />
-            </label>
-            <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Your message *</span>
+              <span className="mb-2 flex items-center justify-between gap-4"><span>Your message *</span><span className="font-normal text-[#8A7D70]">{message.length}/{messageLimit}</span></span>
               <textarea
                 required
+                maxLength={messageLimit}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                className={getInputClasses("min-h-[132px] resize-y bg-white text-base lg:text-sm")}
-                placeholder="Write the note that will be printed with the portrait."
+                className={getInputClasses("gift-message-dialog__control min-h-[126px] resize-y bg-white leading-6")}
+                placeholder="Write a personal note for the recipient."
               />
             </label>
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="sticky bottom-0 -mx-5 flex gap-3 border-t border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:mx-0 lg:justify-end lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-2">
               <button
                 type="button"
-                onClick={() => setPreviewNotice("Card preview is updated on the left.")}
-                className="ui-outline-control min-h-12 rounded-[8px] border border-[#D8CBB8] bg-white/72 px-5 text-sm font-semibold text-[#31271F] transition-colors"
+                onClick={onClose}
+                disabled={busy}
+                className="ui-outline-control min-h-12 flex-1 rounded-[8px] border border-[#D8CBB8] bg-white px-5 text-sm font-semibold text-[#31271F] transition-colors lg:flex-none"
               >
-                Card Preview
+                Cancel
               </button>
               <button
                 type="submit"
                 disabled={!canSave || busy}
-                className="min-h-12 rounded-[8px] bg-[#31271F] px-5 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99]"
+                className="min-h-12 flex-[1.4] rounded-[8px] bg-[#31271F] px-5 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99] lg:flex-none"
                 aria-busy={busy}
               >
                 {busy ? "Saving..." : "Add Gift Message"}
               </button>
             </div>
-            <p aria-live="polite" className={`min-h-5 text-sm font-semibold text-[#5F564B] ${previewNotice ? "" : "sr-only"}`}>
-              {previewNotice}
-            </p>
           </form>
         </div>
       </section>

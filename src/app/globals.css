@@ -91,10 +91,18 @@ a {
   line-height: 16px;
 }
 
+.gift-message-dialog__control {
+  font-size: 16px;
+}
+
 @media (min-width: 1024px) {
   .modification-composer__textarea {
     font-size: 13px;
     line-height: 19px;
+  }
+
+  .gift-message-dialog__control {
+    font-size: 14px;
   }
 }
 
