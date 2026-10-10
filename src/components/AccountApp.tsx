@@ -13,6 +13,7 @@ import {
   PaymentStatusPanel,
 } from "@/components/LegacyAccountPanels";
 import { createDesignPreviewOrder, designPreviewCustomer } from "@/lib/design-preview";
+import { STOREFRONT_CREATE_PATH, withFlowResumeFlag } from "@/lib/storefront-paths";
 import type {
   AccountOrder,
   AccountView,
@@ -93,6 +94,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [designPreview, setDesignPreview] = useState(false);
+  const [flowCached, setFlowCached] = useState(false);
 
   const reload = useCallback(async () => {
     const previewStage = previewStageFromLocation();
@@ -105,7 +107,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
         storefrontUrl: "http://127.0.0.1:9292",
         nativeAccountUrl: "/account",
         nativeAccountProfileUrl: "/account/profile",
-        createPath: "/products/custom-realism-oil-portrait?view=new-flow",
+        createPath: STOREFRONT_CREATE_PATH,
         cartPath: "/cart",
       });
       setDesignPreview(true);
@@ -153,10 +155,26 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
     setActiveView(initialView);
   }, [initialView]);
 
+  useEffect(() => {
+    if (!customer || designPreview) return;
+    const shop = shopFromLocation();
+    const query = shop ? `?shop=${encodeURIComponent(shop)}` : "";
+    let cancelled = false;
+    fetch(`/api/flow-cache${query}`, { credentials: "same-origin" })
+      .then((response) => (response.ok ? response.json() : { cached: false }))
+      .then((json: { cached?: boolean }) => {
+        if (!cancelled) setFlowCached(!!json?.cached);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [customer, designPreview]);
+
   const storefrontUrl = config?.storefrontUrl || "";
-  const createUrl = storefrontUrl
-    ? `${storefrontUrl}${config?.createPath || "/products/custom-realism-oil-portrait?view=new-flow"}`
-    : config?.createPath || "/";
+  const createPath = config?.createPath || STOREFRONT_CREATE_PATH;
+  const createUrl = storefrontUrl ? `${storefrontUrl}${createPath}` : "/";
+  const flowEntryUrl = flowCached ? withFlowResumeFlag(createUrl) : createUrl;
   const cartUrl = storefrontUrl ? `${storefrontUrl}${config?.cartPath || "/cart"}` : "/cart";
 
   const openView = (view: AccountView) => {
@@ -240,7 +258,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FBF8F3] text-[#2D241B]">
-      <StorefrontHeader storefrontUrl={storefrontUrl} cartUrl={cartUrl} />
+      <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={flowEntryUrl} cartUrl={cartUrl} cached={flowCached} />
       <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 pt-[88px] sm:px-6 lg:px-10 ${usesAccountFooter ? "pb-12" : "pb-[120px]"} ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}>
         {loading ? <p className="min-h-[240px] text-sm text-[#5F564B]" aria-live="polite">Loading your workspace…</p> : null}
         {!loading && (error || !customer) ? (
@@ -259,13 +277,13 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
                 <OrderWorkspace
                   orders={orders}
                   customer={customer}
-                  onCreate={() => { window.location.href = createUrl; }}
+                  onCreate={() => { window.location.href = flowEntryUrl; }}
                   onReview={handleReview}
                   onSaveGift={handleSaveGift}
                   onDetailChange={setDetailOpen}
                 />
               ) : null}
-              {activeView === "payment-status" ? <PaymentStatusPanel accountOrders={orders} onCreate={() => { window.location.href = createUrl; }} /> : null}
+              {activeView === "payment-status" ? <PaymentStatusPanel accountOrders={orders} onCreate={() => { window.location.href = flowEntryUrl; }} /> : null}
               {activeView === "account" ? <AccountOverview customer={customer} profileUrl={config?.nativeAccountProfileUrl || config?.nativeAccountUrl || "#"} /> : null}
             </section>
           </>

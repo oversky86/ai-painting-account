@@ -145,6 +145,7 @@ export function deriveOrderStage(input: {
 
 export function computeEditability(input: {
   fulfillmentStatus: string | null;
+  financialStatus?: string | null;
   cancelledAt: string | null;
   closedAt: string | null;
   orderStage: OrderStage;
@@ -152,6 +153,7 @@ export function computeEditability(input: {
   versionCount?: number;
 }) {
   const fulfillment = (input.fulfillmentStatus || "").toUpperCase();
+  const refunded = ["REFUNDED", "VOIDED"].includes((input.financialStatus || "").toUpperCase());
   const locked =
     Boolean(input.cancelledAt) ||
     Boolean(input.closedAt) ||
@@ -162,6 +164,7 @@ export function computeEditability(input: {
 
   let reason: string | null = null;
   if (input.cancelledAt) reason = "This order was cancelled.";
+  else if (refunded) reason = "This order was refunded.";
   else if (input.closedAt) reason = "This order is closed.";
   else if (fulfillment === "FULFILLED" || fulfillment.includes("DELIVERED"))
     reason = "Shipping has already started for this order.";
@@ -170,18 +173,15 @@ export function computeEditability(input: {
 
   const business = normalizeBusinessStatus(input.businessStatus);
   const versionCount = input.versionCount ?? 0;
-  const canModify =
-    input.orderStage === "review" &&
-    business === "portrait_review" &&
-    canRequestModification(versionCount) &&
-    !input.cancelledAt &&
-    !input.closedAt;
-
   const canReview =
     input.orderStage === "review" &&
     business === "portrait_review" &&
+    versionCount > 0 &&
     !input.cancelledAt &&
+    !refunded &&
     !input.closedAt;
+
+  const canModify = canReview && canRequestModification(versionCount);
 
   return {
     canReview,

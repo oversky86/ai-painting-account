@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 
 type StorefrontChromeProps = {
   storefrontUrl: string;
+  createUrl: string;
   cartUrl: string;
+  cached?: boolean;
 };
 
 const navigation = [
@@ -22,7 +24,9 @@ function storefrontHref(origin: string, path: string) {
 
 export function StorefrontHeader({
   storefrontUrl,
+  createUrl,
   cartUrl,
+  cached = false,
 }: StorefrontChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -93,6 +97,12 @@ export function StorefrontHeader({
             aria-label="Cart"
           >
             <ShoppingBag size={18} strokeWidth={2} aria-hidden="true" />
+          </a>
+          <a
+            href={createUrl}
+            className="storefront-header__cta inline-flex items-center justify-center whitespace-nowrap rounded-[8px] bg-[#31271F] font-normal text-[#FBF8F3] transition-colors hover:bg-[#241C16]"
+          >
+            {cached ? "Resume" : "Create Artwork"}
           </a>
           <button
             type="button"
