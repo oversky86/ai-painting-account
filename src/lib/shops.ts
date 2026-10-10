@@ -1,4 +1,8 @@
-import { STOREFRONT_CREATE_PATH } from "./storefront-paths";
+import {
+  LIVE_SHOP_DOMAIN,
+  LIVE_STOREFRONT_CREATE_PATH,
+  STOREFRONT_CREATE_PATH,
+} from "./storefront-paths";
 
 export type ShopConfig = {
   /** myshopify.com domain (canonical key) */
@@ -66,6 +70,23 @@ function parseAccountShops(): ShopConfig[] {
   }
 }
 
+const LIVE_SHOP_ALIASES = new Set([
+  LIVE_SHOP_DOMAIN,
+  "view-brush.myshopify.com",
+  "viewbrush.com",
+  "www.viewbrush.com",
+]);
+
+const RETIRED_SHOP = "w4yzmt-vv.myshopify.com";
+
+const builtinLiveShop: ShopConfig = {
+  storeDomain: LIVE_SHOP_DOMAIN,
+  clientId: "a82e09b2fd0499c59c41187578e65b80",
+  storefrontUrl: "https://viewbrush.com",
+  nativeAccountUrl: "https://shopify.com/80278749322/account",
+  nativeAccountProfileUrl: "https://shopify.com/80278749322/account/profile",
+};
+
 let cachedShops: ShopConfig[] | null = null;
 
 export function listShopConfigs(): ShopConfig[] {
@@ -76,6 +97,10 @@ export function listShopConfigs(): ShopConfig[] {
   for (const shop of fromJson) byDomain.set(shop.storeDomain, shop);
   if (legacy && !byDomain.has(legacy.storeDomain)) {
     byDomain.set(legacy.storeDomain, legacy);
+  }
+  byDomain.delete(RETIRED_SHOP);
+  if (!byDomain.has(builtinLiveShop.storeDomain)) {
+    byDomain.set(builtinLiveShop.storeDomain, builtinLiveShop);
   }
   cachedShops = [...byDomain.values()];
   if (!cachedShops.length) {
@@ -102,9 +127,13 @@ export function resolveShopConfig(hint?: string | null): ShopConfig {
   if (exact) return exact;
   const byStorefront = shops.find((s) => {
     const host = normalizeShopDomain(s.storefrontUrl);
-    return host === normalized;
+    return host === normalized || host === `www.${normalized}`;
   });
   if (byStorefront) return byStorefront;
+  if (LIVE_SHOP_ALIASES.has(normalized)) {
+    const live = shops.find((s) => s.storeDomain === LIVE_SHOP_DOMAIN);
+    if (live) return live;
+  }
   throw new Error(`Unknown shop: ${normalized}`);
 }
 
@@ -121,7 +150,10 @@ export function publicConfigFor(shop: ShopConfig) {
     storefrontUrl: shop.storefrontUrl,
     nativeAccountUrl: shop.nativeAccountUrl,
     nativeAccountProfileUrl: shop.nativeAccountProfileUrl,
-    createPath: STOREFRONT_CREATE_PATH,
+    createPath:
+      shop.storeDomain === LIVE_SHOP_DOMAIN
+        ? LIVE_STOREFRONT_CREATE_PATH
+        : STOREFRONT_CREATE_PATH,
     cartPath: "/cart",
     storeDomain: shop.storeDomain,
   };
