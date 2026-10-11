@@ -100,7 +100,7 @@ export function StorefrontHeader({
           </a>
           <a
             href={createUrl}
-            className="storefront-header__cta inline-flex items-center justify-center whitespace-nowrap rounded-[8px] bg-[#31271F] font-normal text-[#FBF8F3] transition-colors hover:bg-[#241C16]"
+            className="storefront-header__primary-action inline-flex items-center justify-center whitespace-nowrap rounded-[8px] bg-[#31271F] font-normal text-[#FBF8F3] transition-colors hover:bg-[#241C16]"
           >
             {cached ? "Resume" : "Create Artwork"}
           </a>
