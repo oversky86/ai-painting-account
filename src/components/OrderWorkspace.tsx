@@ -1121,12 +1121,12 @@ function GiftMessageDialog({
   }, [busy, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#241C16]/[0.62] backdrop-blur-sm lg:flex lg:items-center lg:justify-center lg:p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-[#241C16]/[0.62] p-4 backdrop-blur-sm sm:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="gift-message-title"
-        className="mx-auto min-h-dvh w-full bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] lg:min-h-0 lg:max-h-[calc(100dvh-48px)] lg:max-w-[1040px] lg:overflow-y-auto lg:rounded-[8px] lg:border lg:border-[#DCCFBC]"
+        className="mx-auto max-h-[calc(100dvh-32px)] w-full max-w-[1040px] overflow-y-auto overscroll-contain rounded-[8px] border border-[#DCCFBC] bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] sm:max-h-[calc(100dvh-48px)]"
       >
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:px-8 lg:py-5">
           <div>
@@ -1215,14 +1215,14 @@ function GiftMessageDialog({
                 type="button"
                 onClick={onClose}
                 disabled={busy}
-                className="ui-outline-control min-h-12 flex-1 rounded-[8px] border border-[#D8CBB8] bg-white px-5 text-sm font-semibold text-[#31271F] transition-colors lg:flex-none"
+                className="ui-outline-control min-h-12 flex-1 whitespace-nowrap rounded-[8px] border border-[#D8CBB8] bg-white px-3 text-sm font-semibold text-[#31271F] transition-colors sm:px-5 lg:flex-none"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!canSave || busy}
-                className="min-h-12 flex-[1.4] rounded-[8px] bg-[#31271F] px-5 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99] lg:flex-none"
+                className="min-h-12 flex-[1.4] whitespace-nowrap rounded-[8px] bg-[#31271F] px-3 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99] sm:px-5 lg:flex-none"
                 aria-busy={busy}
               >
                 {busy ? "Saving..." : "Add Gift Message"}

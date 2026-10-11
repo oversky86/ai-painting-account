@@ -95,6 +95,13 @@ a {
   font-size: 16px;
 }
 
+.gift-message-dialog__control:focus-visible {
+  border-color: #241c16;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
 @media (min-width: 1024px) {
   .modification-composer__textarea {
     font-size: 13px;
