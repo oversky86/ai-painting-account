@@ -121,21 +121,23 @@ a {
   line-height: 16px;
 }
 
-.storefront-header__cta {
+.storefront-header__primary-action {
   width: auto;
   height: 40px;
   min-height: 40px;
+  min-width: 0;
   padding: 0 14px;
   font-size: 13px;
+  letter-spacing: 0;
   line-height: 1;
+  text-decoration: none;
 }
 
 @media (min-width: 640px) {
-  .storefront-header__cta {
-    width: 139px;
-    height: 38px;
-    min-height: 38px;
-    padding: 0 20px;
+  .storefront-header__primary-action {
+    height: auto;
+    min-height: 0;
+    padding: 12px 20px;
     font-size: 14px;
   }
 }
