@@ -184,8 +184,32 @@ function OrderListCard({
 }) {
   const [giftOpen, setGiftOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [giftError, setGiftError] = useState("");
   const image = artworkUrl(order);
+  const hasGiftMessage = Boolean(order.giftMessage);
   const primaryLabel = order.orderStage === "review" ? "Review Portrait" : "View Order";
+
+  const openGiftMessage = () => {
+    setGiftError("");
+    setGiftOpen(true);
+  };
+
+  const handleGiftToggle = async (enabled: boolean) => {
+    setGiftError("");
+    if (enabled) {
+      setGiftOpen(true);
+      return;
+    }
+    if (!hasGiftMessage || busy) return;
+    setBusy(true);
+    try {
+      await onSaveGift(order, null);
+    } catch {
+      setGiftError("We couldn't remove the gift message. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -219,10 +243,63 @@ function OrderListCard({
 
         <div className="mt-5 grid gap-3 border-t border-[#E5DCCF] pt-5 lg:mt-0 lg:border-0 lg:p-0">
           <button type="button" onClick={onOpen} className={buttonPrimary}>{primaryLabel}</button>
-          <button type="button" onClick={() => setGiftOpen(true)} disabled={!order.canEditGift || busy} className={`${buttonSecondary} gap-2`}>
-            <Gift size={16} aria-hidden="true" />
-            {order.giftMessage ? "Edit Gift Message" : "Add Gift Message"}
-          </button>
+          <div
+            className={`grid min-h-[52px] grid-cols-[minmax(0,1fr)_52px] items-center rounded-[8px] border bg-white transition-colors lg:hidden ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
+            aria-busy={busy}
+          >
+            <button
+              type="button"
+              onClick={openGiftMessage}
+              disabled={!order.canEditGift || busy}
+              className="flex min-h-[50px] min-w-0 items-center gap-3 rounded-l-[7px] px-4 text-left disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={hasGiftMessage ? "Edit gift message" : "Add gift message"}
+            >
+              <Gift size={17} className="shrink-0 text-[#6E6254]" aria-hidden="true" />
+              <span className="grid min-w-0 gap-0.5">
+                <strong className="truncate text-sm font-semibold text-[#2D241B]">Gift message</strong>
+                <span className="truncate text-[11px] leading-4 text-[#7A6E62]">{hasGiftMessage ? "Added · Tap to edit" : "Not added"}</span>
+              </span>
+            </button>
+            <label className="relative flex min-h-11 min-w-11 items-center justify-center rounded-[7px]" aria-label={hasGiftMessage ? "Remove gift message" : "Include gift message"}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={hasGiftMessage}
+                disabled={!order.canEditGift || busy}
+                onChange={(event) => { void handleGiftToggle(event.currentTarget.checked); }}
+                className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              />
+              <span className="pointer-events-none relative block h-6 w-10 rounded-full bg-[#C9BDAA] transition-colors peer-checked:bg-[#31271F] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#31271F] peer-disabled:opacity-50" aria-hidden="true">
+                <span className={`pointer-events-none absolute top-[3px] block h-[18px] w-[18px] rounded-full bg-[#FFFDFB] shadow-[0_1px_4px_rgba(49,39,31,0.24)] transition-transform ${hasGiftMessage ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
+              </span>
+            </label>
+          </div>
+          <div
+            className={`hidden min-h-12 items-center rounded-[8px] border bg-white transition-colors lg:flex ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
+            aria-busy={busy}
+          >
+            <label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-4 text-sm font-medium text-[#31271F]">
+              <input
+                type="checkbox"
+                checked={hasGiftMessage}
+                disabled={!order.canEditGift || busy}
+                onChange={(event) => { void handleGiftToggle(event.currentTarget.checked); }}
+                className="h-[18px] w-[18px] shrink-0 accent-[#31271F]"
+              />
+              <span className="truncate">{hasGiftMessage ? "Gift message added" : "Add Gift Message"}</span>
+            </label>
+            {hasGiftMessage ? (
+              <button
+                type="button"
+                onClick={openGiftMessage}
+                disabled={!order.canEditGift || busy}
+                className="min-h-11 px-4 text-sm font-semibold text-[#31271F] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Edit
+              </button>
+            ) : null}
+          </div>
+          {giftError && !giftOpen ? <p className="text-xs leading-5 text-[#A33A32]" role="alert">{giftError}</p> : null}
         </div>
       </article>
 
@@ -231,12 +308,16 @@ function OrderListCard({
           initialMessage={order.giftMessage}
           senderPlaceholder={senderPlaceholder}
           busy={busy}
+          error={giftError}
           onClose={() => setGiftOpen(false)}
           onSave={async (message) => {
+            setGiftError("");
             setBusy(true);
             try {
               await onSaveGift(order, message);
               setGiftOpen(false);
+            } catch {
+              setGiftError("We couldn't save the gift message. Please try again.");
             } finally {
               setBusy(false);
             }
@@ -1091,12 +1172,14 @@ function GiftMessageDialog({
   initialMessage,
   senderPlaceholder,
   busy,
+  error,
   onClose,
   onSave,
 }: {
   initialMessage: GiftMessage | null;
   senderPlaceholder: string;
   busy: boolean;
+  error: string;
   onClose: () => void;
   onSave: (message: GiftMessage) => Promise<void>;
 }) {
@@ -1210,6 +1293,7 @@ function GiftMessageDialog({
                 placeholder="Write a personal note for the recipient."
               />
             </label>
+            {error ? <p role="alert" className="text-sm font-medium leading-5 text-[#A33A32]">{error}</p> : null}
             <div className="sticky bottom-0 -mx-5 flex gap-3 border-t border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:mx-0 lg:justify-end lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-2">
               <button
                 type="button"
