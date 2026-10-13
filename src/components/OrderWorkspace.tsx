@@ -244,7 +244,7 @@ function OrderListCard({
         <div className="mt-5 grid gap-3 border-t border-[#E5DCCF] pt-5 lg:mt-0 lg:border-0 lg:p-0">
           <button type="button" onClick={onOpen} className={buttonPrimary}>{primaryLabel}</button>
           <div
-            className={`grid min-h-[52px] grid-cols-[52px_minmax(0,1fr)_52px] items-center rounded-[8px] border bg-white transition-colors lg:hidden ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
+            className={`grid min-h-[52px] grid-cols-[52px_minmax(0,1fr)_52px] items-center rounded-[8px] border bg-white transition-colors ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
             aria-busy={busy}
           >
             <label className="relative flex min-h-11 min-w-11 items-center justify-center rounded-[7px]" aria-label={hasGiftMessage ? "Remove gift message" : "Include gift message"}>
@@ -260,7 +260,10 @@ function OrderListCard({
                 <span className={`pointer-events-none absolute top-[3px] block h-[18px] w-[18px] rounded-full bg-[#FFFDFB] shadow-[0_1px_4px_rgba(49,39,31,0.24)] transition-transform ${hasGiftMessage ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
               </span>
             </label>
-            <strong className="truncate px-2 text-center text-sm font-semibold text-[#2D241B]">Gift message</strong>
+            <span className="flex min-w-0 items-center justify-center gap-2 px-2 text-[#2D241B]">
+              <Gift size={16} className="shrink-0 text-[#6E6254]" aria-hidden="true" />
+              <strong className="truncate text-sm font-semibold">Gift Message</strong>
+            </span>
             {hasGiftMessage ? (
               <button
                 type="button"
@@ -271,31 +274,6 @@ function OrderListCard({
                 Edit
               </button>
             ) : <span aria-hidden="true" />}
-          </div>
-          <div
-            className={`hidden min-h-12 items-center justify-center gap-3 rounded-[8px] border bg-white px-4 transition-colors lg:flex ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
-            aria-busy={busy}
-          >
-            <label className="flex min-h-12 min-w-0 items-center gap-3 text-sm font-medium text-[#31271F]">
-              <input
-                type="checkbox"
-                checked={hasGiftMessage}
-                disabled={!order.canEditGift || busy}
-                onChange={(event) => { void handleGiftToggle(event.currentTarget.checked); }}
-                className="h-[18px] w-[18px] shrink-0 accent-[#31271F]"
-              />
-              <span className="truncate">Add Gift Message</span>
-            </label>
-            {hasGiftMessage ? (
-              <button
-                type="button"
-                onClick={openGiftMessage}
-                disabled={!order.canEditGift || busy}
-                className="min-h-11 px-1 text-sm font-semibold text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Edit
-              </button>
-            ) : null}
           </div>
           {giftError && !giftOpen ? <p className="text-xs leading-5 text-[#A33A32]" role="alert">{giftError}</p> : null}
         </div>
