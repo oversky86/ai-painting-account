@@ -247,19 +247,20 @@ function OrderListCard({
             className={`grid min-h-[52px] grid-cols-[minmax(0,1fr)_52px] items-center rounded-[8px] border bg-white transition-colors lg:hidden ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
             aria-busy={busy}
           >
-            <button
-              type="button"
-              onClick={openGiftMessage}
-              disabled={!order.canEditGift || busy}
-              className="flex min-h-[50px] min-w-0 items-center gap-3 rounded-l-[7px] px-4 text-left disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label={hasGiftMessage ? "Edit gift message" : "Add gift message"}
-            >
+            <div className="flex min-h-[50px] min-w-0 items-center gap-3 px-4">
               <Gift size={17} className="shrink-0 text-[#6E6254]" aria-hidden="true" />
-              <span className="grid min-w-0 gap-0.5">
-                <strong className="truncate text-sm font-semibold text-[#2D241B]">Gift message</strong>
-                <span className="truncate text-[11px] leading-4 text-[#7A6E62]">{hasGiftMessage ? "Added · Tap to edit" : "Not added"}</span>
-              </span>
-            </button>
+              <strong className="truncate text-sm font-semibold text-[#2D241B]">Gift message</strong>
+              {hasGiftMessage ? (
+                <button
+                  type="button"
+                  onClick={openGiftMessage}
+                  disabled={!order.canEditGift || busy}
+                  className="min-h-11 shrink-0 px-1 text-[13px] font-semibold text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Edit
+                </button>
+              ) : null}
+            </div>
             <label className="relative flex min-h-11 min-w-11 items-center justify-center rounded-[7px]" aria-label={hasGiftMessage ? "Remove gift message" : "Include gift message"}>
               <input
                 type="checkbox"
@@ -275,10 +276,10 @@ function OrderListCard({
             </label>
           </div>
           <div
-            className={`hidden min-h-12 items-center rounded-[8px] border bg-white transition-colors lg:flex ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
+            className={`hidden min-h-12 items-center justify-center gap-3 rounded-[8px] border bg-white px-4 transition-colors lg:flex ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
             aria-busy={busy}
           >
-            <label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-4 text-sm font-medium text-[#31271F]">
+            <label className="flex min-h-12 min-w-0 items-center gap-3 text-sm font-medium text-[#31271F]">
               <input
                 type="checkbox"
                 checked={hasGiftMessage}
@@ -293,7 +294,7 @@ function OrderListCard({
                 type="button"
                 onClick={openGiftMessage}
                 disabled={!order.canEditGift || busy}
-                className="min-h-11 px-4 text-sm font-semibold text-[#31271F] disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-11 px-1 text-sm font-semibold text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Edit
               </button>
