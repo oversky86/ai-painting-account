@@ -174,6 +174,15 @@ export function tryResolveShopConfig(hint?: string | null): ShopConfig {
   }
 }
 
+/** Where Sign out lands. Live goes to the public storefront; dev goes home. */
+export function logoutLandingUrl(shop: ShopConfig): string {
+  if (publicShopKey(shop.storeDomain) === PUBLIC_SHOP_PROD) {
+    return "https://www.viewbrush.com/";
+  }
+  const home = stripSlash(shop.storefrontUrl || `https://${shop.storeDomain}`);
+  return `${home}/`;
+}
+
 export function publicConfigFor(shop: ShopConfig) {
   return {
     storefrontUrl: shop.storefrontUrl,

@@ -16,7 +16,7 @@
 
 | 名称 | 说明 |
 | --- | --- |
-| `ACCOUNT_WEB_URL` | `https://ai-painting-account.vercel.app` |
+| `ACCOUNT_WEB_URL` | `https://orders.viewbrush.com` |
 | `ACCOUNT_SHOPS` | 店铺 JSON 数组（见 `.env.example`）。两家店都要配 |
 | `SESSION_SECRET` | 至少 32 位随机字符 |
 | `ACCOUNT_HMAC_SECRET` | 与 pet 应用相同 |
@@ -66,7 +66,10 @@
 
 ```toml
 [customer_authentication]
-redirect_uris = [ "https://ai-painting-account.vercel.app/api/auth/callback" ]
+redirect_uris = [
+  "https://orders.viewbrush.com/api/auth/callback",
+  "https://ai-painting-account.vercel.app/api/auth/callback"
+]
 ```
 
 然后对每个配置执行 `shopify app deploy`。
@@ -77,7 +80,7 @@ redirect_uris = [ "https://ai-painting-account.vercel.app/api/auth/callback" ]
 - 从线上店店面进入 `/orders?shop=prod`，应看到线上店订单和该店的客户账户链接
 - 已登录时切换店铺，会按目标店重新登录
 - 访客从店面登录进入账户页后，会带着 `shop` 跳到 account-web
-- 退出登录会清掉 account-web 会话，并回到该店的店面登出
+- 线上店退出登录后回到 https://www.viewbrush.com/；开发店退出后回到开发店首页
 
 ## 6. 新店上线还要做的操作
 

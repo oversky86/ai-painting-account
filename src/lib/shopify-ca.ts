@@ -1,5 +1,4 @@
-import type { ShopConfig } from "./shops";
-import { getEnv } from "./env";
+import { logoutLandingUrl, type ShopConfig } from "./shops";
 import type { SessionTokens } from "./types";
 
 type OpenIdConfig = {
@@ -164,10 +163,9 @@ export async function buildLogoutUrl(
   shop: ShopConfig,
   idToken?: string,
 ): Promise<string> {
-  const { accountWebUrl } = getEnv();
   const { end_session_endpoint } = await getOpenIdConfig(shop);
   const url = new URL(end_session_endpoint);
   if (idToken) url.searchParams.set("id_token_hint", idToken);
-  url.searchParams.set("post_logout_redirect_uri", `${accountWebUrl}/`);
+  url.searchParams.set("post_logout_redirect_uri", logoutLandingUrl(shop));
   return url.toString();
 }
