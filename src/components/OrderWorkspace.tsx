@@ -5,6 +5,7 @@ import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
+  SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import {
   ArrowLeft,
@@ -666,9 +667,18 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
   const [pendingSelection, setPendingSelection] = useState<ModificationSelection | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [imageAspectRatio, setImageAspectRatio] = useState(799 / 1200);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const draftRef = useRef<ModificationSelection | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const imageIsWideForDesktopCanvas = imageAspectRatio > 608 / 626;
+
+  const handleImageLoad = (event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setImageAspectRatio(naturalWidth / naturalHeight);
+    }
+  };
 
   useEffect(() => {
     if (!selecting || pendingSelection) return;
@@ -795,7 +805,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
         </div>
 
         <div className="mt-5 grid gap-6 lg:mx-[30px] lg:mt-[23px] lg:grid-cols-[640px_374px] lg:gap-[33px]">
-          <div className="relative aspect-[163/173] overflow-hidden rounded-[8px] bg-[#EFE8DD] lg:h-[658px] lg:w-[640px] lg:aspect-auto lg:px-[70px] lg:py-4">
+          <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:h-[658px] lg:w-[640px]">
             <div
               ref={canvasRef}
               onPointerDown={onPointerDown}
@@ -806,9 +816,10 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               role="application"
               tabIndex={selecting ? 0 : -1}
               aria-label={selecting ? "Draw a rectangular modification area on the portrait" : "Select area to enable portrait annotation"}
-              className={`relative h-full w-full touch-none overflow-hidden rounded-[8px] select-none lg:overflow-visible lg:rounded-none ${selecting && !pendingSelection ? "cursor-crosshair ring-2 ring-[#2F9E5F]/20" : "cursor-default"}`}
+              className={`relative w-full touch-none overflow-hidden rounded-[8px] select-none lg:rounded-none ${imageIsWideForDesktopCanvas ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"} ${selecting && !pendingSelection ? "cursor-crosshair ring-2 ring-[#2F9E5F]/20" : "cursor-default"}`}
+              style={{ aspectRatio: imageAspectRatio }}
             >
-              {image ? <PreviewImage src={image} alt="Portrait to annotate" className="h-full w-full rounded-[8px] object-cover lg:rounded-none" /> : null}
+              {image ? <PreviewImage src={image} alt="Portrait to annotate" className="h-full w-full rounded-[8px] object-contain lg:rounded-none" onLoad={handleImageLoad} /> : null}
               <SelectionOverlays notes={overlayNotes} />
               {pendingSelection ? (
                 <PendingModificationEditor
@@ -978,11 +989,24 @@ function AnnotatedImage({
   className?: string;
   fit?: "cover" | "review";
 }) {
+  const [imageAspectRatio, setImageAspectRatio] = useState(799 / 1200);
+  const imageIsWideForReview = imageAspectRatio > 732 / 466;
+
+  const handleImageLoad = (event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setImageAspectRatio(naturalWidth / naturalHeight);
+    }
+  };
+
   if (fit === "review") {
     return (
-      <div className={`relative flex aspect-square min-h-[326px] items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:aspect-auto lg:h-[506px] lg:p-5 ${className}`}>
-        <div className="relative aspect-[799/1200] h-full max-h-full max-w-full overflow-hidden">
-          {src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-contain" /> : null}
+      <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:h-[506px] lg:p-5 ${className}`}>
+        <div
+          className={`relative w-full overflow-hidden ${imageIsWideForReview ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"}`}
+          style={{ aspectRatio: imageAspectRatio }}
+        >
+          {src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-contain" onLoad={handleImageLoad} /> : null}
           <SelectionOverlays notes={notes} activeId={activeId} />
         </div>
       </div>
@@ -1295,8 +1319,8 @@ function GiftMessageDialog({
   );
 }
 
-function PreviewImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+function PreviewImage({ src, alt, className, onLoad }: { src: string; alt: string; className: string; onLoad?: (event: ReactSyntheticEvent<HTMLImageElement>) => void }) {
   // Shopify media URLs are dynamic and cannot be enumerated in next.config.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} />;
+  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} onLoad={onLoad} />;
 }
