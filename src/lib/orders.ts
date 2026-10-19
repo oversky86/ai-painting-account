@@ -322,10 +322,21 @@ function collectTracking(order: CaOrder): TrackingDetails | null {
       (item) => item.number || item.url,
     );
     if (!tracking) continue;
+    let trackingUrl = "";
+    if (tracking.url) {
+      try {
+        const parsedUrl = new URL(tracking.url);
+        if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
+          trackingUrl = parsedUrl.toString();
+        }
+      } catch {
+        trackingUrl = "";
+      }
+    }
     return {
-      company: tracking.company || "Carrier",
+      company: tracking.company || "",
       number: tracking.number || "",
-      url: tracking.url || "",
+      url: trackingUrl,
       status: fulfillment.latestShipmentStatus || fulfillment.status || "In transit",
       estimatedDeliveryAt: fulfillment.estimatedDeliveryAt || null,
     };

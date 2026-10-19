@@ -9,6 +9,7 @@ import type {
 } from "react";
 import {
   ArrowLeft,
+  ExternalLink,
   Gift,
   History,
   ImageIcon,
@@ -549,20 +550,38 @@ function RevisionPanel({ order }: { order: AccountOrder }) {
 
 function ShippedPanel({ order }: { order: AccountOrder }) {
   const tracking = order.tracking;
-  const estimate = tracking?.estimatedDeliveryAt
-    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(tracking.estimatedDeliveryAt))
-    : "Pending";
+  const company = tracking?.company || "Not available";
+  const trackingNumber = tracking?.number || "Not available";
+  const trackingUrl = tracking?.number ? tracking.url : "";
   return (
     <>
       <article className="h-[110px] overflow-hidden rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:h-auto lg:p-6"><h3 className="text-lg font-bold lg:text-xl">Your portrait has shipped.</h3><p className="mt-2 text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">This approved portrait has shipped. Changes are no longer available for this order.</p></article>
-      <article className="h-[324px] rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:h-auto lg:min-h-[220px] lg:p-6">
-        <div className="flex items-center justify-between gap-4"><h3 className="text-lg font-bold lg:text-xl">Tracking details</h3><span className="rounded-[6px] border border-[#97CDAA] bg-[#E9F6EE] px-5 py-2 text-xs font-semibold text-[#2F7D46]">{tracking?.status || "In transit"}</span></div>
-        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">The package has left the studio. Track shipment updates from the carrier until delivery is complete.</p>
-        <div className="mt-4 grid gap-4 border-t border-[#E7DCCC] pt-4 text-sm lg:grid-cols-[280px_220px_180px] lg:items-center">
-          <div><p className="text-xs text-[#6C6054]">Tracking #</p><strong className="mt-1 block break-all">{tracking?.number || "Not available"}</strong></div>
-          <div><p className="text-xs text-[#6C6054]">Estimated delivery</p><strong className="mt-1 block">{estimate}</strong></div>
-          {tracking?.url ? <a href={tracking.url} target="_blank" rel="noreferrer" className={`${buttonPrimary} w-full`}>Track</a> : null}
-        </div>
+      <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:min-h-[220px] lg:p-6">
+        <h3 className="text-lg font-bold lg:text-xl">Tracking details</h3>
+        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">Use the tracking number below to view the latest shipment details from the carrier.</p>
+        <dl className="mt-5 grid gap-5 border-t border-[#E7DCCC] pt-5 text-sm sm:grid-cols-2 lg:max-w-[680px] lg:gap-10">
+          <div>
+            <dt className="text-xs font-medium text-[#6C6054]">Carrier</dt>
+            <dd className="mt-2 font-semibold text-[#241C16]">{company}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-[#6C6054]">Tracking Number</dt>
+            <dd className="mt-2 min-w-0">
+              {trackingUrl ? (
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 max-w-full items-center gap-2 break-all font-semibold text-[#5E4936] underline decoration-1 underline-offset-4 hover:text-[#31271F]"
+                  aria-label={`Track shipment ${trackingNumber} with ${company}`}
+                >
+                  <span>{trackingNumber}</span>
+                  <ExternalLink size={14} className="shrink-0" aria-hidden="true" />
+                </a>
+              ) : <span className="font-semibold text-[#241C16]">{trackingNumber}</span>}
+            </dd>
+          </div>
+        </dl>
       </article>
     </>
   );
