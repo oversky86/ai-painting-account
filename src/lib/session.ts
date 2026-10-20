@@ -22,6 +22,7 @@ export type PkceState = {
 };
 
 const SHOP_COOKIE = "vb_account_shop";
+const ORDER_LINK_COOKIE = "vb_order_link";
 
 export async function setShopHint(shopDomain: string) {
   const jar = await cookies();
@@ -103,6 +104,21 @@ export async function getPkce(): Promise<PkceState | null> {
 export async function clearPkce() {
   const jar = await cookies();
   jar.delete(PKCE_COOKIE);
+}
+
+export async function setOrderLinkCookie(token: string, maxAge: number) {
+  const jar = await cookies();
+  jar.set(ORDER_LINK_COOKIE, token, cookieBase(Math.max(60, maxAge)));
+}
+
+export async function getOrderLinkCookie(): Promise<string | null> {
+  const jar = await cookies();
+  return jar.get(ORDER_LINK_COOKIE)?.value || null;
+}
+
+export async function clearOrderLinkCookie() {
+  const jar = await cookies();
+  jar.delete(ORDER_LINK_COOKIE);
 }
 
 export async function ensureCsrf(): Promise<string> {

@@ -527,7 +527,7 @@ async function fetchPortraitHistories(
   }
 }
 
-function applyPortraitHistory(
+export function applyPortraitHistory(
   order: AccountOrder,
   history: PortraitHistory | undefined,
 ): AccountOrder {
