@@ -130,17 +130,20 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       const meUrl = shop ? `/api/me?shop=${encodeURIComponent(shop)}` : "/api/me";
       const response = await fetch(meUrl, { credentials: "same-origin" });
       if (response.status === 401) {
+        const onOrdersPage = window.location.pathname === "/orders";
         const params = new URLSearchParams(window.location.search);
-        const link = await fetch("/api/order-link", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: params.get("token") || "",
-            orderId: params.get("order") || "",
-          }),
-        });
-        if (link.ok) {
+        const link = onOrdersPage
+          ? await fetch("/api/order-link", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token: params.get("token") || "",
+                orderId: params.get("order") || "",
+              }),
+            })
+          : null;
+        if (link?.ok) {
           const opened = (await link.json()) as MeResponse;
           if (opened.ok && opened.customer) {
             setGuest(true);
