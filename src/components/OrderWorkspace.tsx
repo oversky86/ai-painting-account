@@ -599,7 +599,7 @@ function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selecte
     { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
     { id: "video" as const, label: "Studio Video", image: order.media.videoPosterUrl || artworkUrl(order), video: true },
   ];
-  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block h-[72px] overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={18} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="block truncate px-2 py-2.5 text-[13px] font-medium">{row.label}</span></button>)}</div>;
+  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[2/3] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={18} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
 }
 
 function PreviewSurface({ image, video, onExpand }: { image: string; video?: string; onExpand?: () => void }) {
@@ -651,7 +651,7 @@ function PreviewSurface({ image, video, onExpand }: { image: string; video?: str
           type="button"
           onClick={() => {videoRef.current?.pause();onExpand();}}
           aria-label={video ? "Open full-screen studio video" : "Open full-screen portrait"}
-          className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[6px] bg-[#35261E]/65 text-white before:absolute before:-inset-1 before:content-[''] hover:bg-[#35261E]/80"
+          className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[6px] bg-[#35261E]/65 text-white before:absolute before:-inset-1 before:content-[''] hover:bg-[#35261E]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#35261E]"
         >
           <Maximize2 size={16} aria-hidden="true" />
         </button>
@@ -1176,15 +1176,59 @@ function VersionCard({ version, expanded, onToggle, onNote }: { version: Artwork
 }
 
 function FullScreenPreview({ image, video, onClose }: { image: string; video?: string; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1);
+
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
   }, [onClose]);
 
-  return <div role="dialog" aria-modal="true" aria-label={video ? "Full-screen studio video" : "Full-screen portrait"} className="fixed inset-0 z-[80] flex items-center justify-center bg-[#241C16]/95 p-5 lg:p-8"><button type="button" onClick={onClose} className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-[8px] bg-white/10 text-white hover:bg-white/20" aria-label={video ? "Close full-screen studio video" : "Close full-screen portrait"}><X /></button>{video ? <video src={video} poster={image} controls autoPlay preload="metadata" playsInline className="max-h-full max-w-full object-contain" /> : <PreviewImage src={image} alt="Full-screen portrait" className="max-h-full max-w-full object-contain" />}</div>;
+  const zoomOut = () => setZoom((current) => Math.max(1, Number((current - 0.5).toFixed(1))));
+  const zoomIn = () => setZoom((current) => Math.min(3, Number((current + 0.5).toFixed(1))));
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label={video ? "Full-screen studio video" : "Full-screen portrait"} className="fixed inset-0 z-[110] bg-[#241C16]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-[8px] bg-black/55 text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] hover:bg-black/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        aria-label={video ? "Close full-screen studio video" : "Close full-screen portrait"}
+      >
+        <X size={22} aria-hidden="true" />
+      </button>
+
+      <div className="flex h-full w-full items-center justify-center overflow-hidden p-5 pb-24 pt-20 lg:p-8 lg:pb-24 lg:pt-20">
+        {video ? (
+          <video src={video} poster={image} controls autoPlay preload="metadata" playsInline className="max-h-full max-w-full object-contain" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center overflow-hidden">
+            <PreviewImage
+              src={image}
+              alt="Full-screen portrait"
+              className="max-h-full max-w-full object-contain transition-transform duration-200 ease-out"
+              style={{ transform: `scale(${zoom})` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {!video ? (
+        <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-[8px] border border-white/15 bg-black/60 p-1.5 text-white shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur">
+          <button type="button" onClick={zoomOut} disabled={zoom <= 1} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom out"><Minus size={18} aria-hidden="true" /></button>
+          <button type="button" onClick={() => setZoom(1)} className="min-h-11 min-w-[72px] rounded-[6px] px-3 text-sm font-semibold tabular-nums hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Reset zoom to 100 percent">{Math.round(zoom * 100)}%</button>
+          <button type="button" onClick={zoomIn} disabled={zoom >= 3} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom in"><Plus size={18} aria-hidden="true" /></button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function GiftMessageDialog({
@@ -1338,8 +1382,8 @@ function GiftMessageDialog({
   );
 }
 
-function PreviewImage({ src, alt, className, onLoad }: { src: string; alt: string; className: string; onLoad?: (event: ReactSyntheticEvent<HTMLImageElement>) => void }) {
+function PreviewImage({ src, alt, className, onLoad, style }: { src: string; alt: string; className: string; onLoad?: (event: ReactSyntheticEvent<HTMLImageElement>) => void; style?: CSSProperties }) {
   // Shopify media URLs are dynamic and cannot be enumerated in next.config.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} onLoad={onLoad} />;
+  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} onLoad={onLoad} style={style} />;
 }
