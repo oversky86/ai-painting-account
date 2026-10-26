@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -599,7 +599,7 @@ function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selecte
     { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
     { id: "video" as const, label: "Studio Video", image: order.media.videoPosterUrl || artworkUrl(order), video: true },
   ];
-  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[2/3] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={18} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
+  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[2/3] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={24} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
 }
 
 function PreviewSurface({ image, video, onExpand }: { image: string; video?: string; onExpand?: () => void }) {
@@ -653,7 +653,7 @@ function PreviewSurface({ image, video, onExpand }: { image: string; video?: str
           aria-label={video ? "Open full-screen studio video" : "Open full-screen portrait"}
           className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[6px] bg-[#35261E]/65 text-white before:absolute before:-inset-1 before:content-[''] hover:bg-[#35261E]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#35261E]"
         >
-          <Maximize2 size={16} aria-hidden="true" />
+          <Maximize2 size={20} aria-hidden="true" />
         </button>
       ) : null}
     </div>
@@ -1177,6 +1177,11 @@ function VersionCard({ version, expanded, onToggle, onNote }: { version: Artwork
 
 function FullScreenPreview({ image, video, onClose }: { image: string; video?: string; onClose: () => void }) {
   const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const fullScreenImageRef = useRef<HTMLImageElement>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1191,8 +1196,78 @@ function FullScreenPreview({ image, video, onClose }: { image: string; video?: s
     };
   }, [onClose]);
 
-  const zoomOut = () => setZoom((current) => Math.max(1, Number((current - 0.5).toFixed(1))));
-  const zoomIn = () => setZoom((current) => Math.min(3, Number((current + 0.5).toFixed(1))));
+  const clampOffset = useCallback((nextOffset: { x: number; y: number }, nextZoom: number) => {
+    const viewport = viewportRef.current;
+    const previewImage = fullScreenImageRef.current;
+    if (!viewport || !previewImage || nextZoom <= 1) return { x: 0, y: 0 };
+    const maxX = Math.max(0, (previewImage.offsetWidth * nextZoom - viewport.clientWidth) / 2);
+    const maxY = Math.max(0, (previewImage.offsetHeight * nextZoom - viewport.clientHeight) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextOffset.x)),
+      y: Math.min(maxY, Math.max(-maxY, nextOffset.y)),
+    };
+  }, []);
+
+  const applyZoom = useCallback((nextZoomValue: number, clientX?: number, clientY?: number) => {
+    const nextZoom = Math.min(3, Math.max(1, Number(nextZoomValue.toFixed(2))));
+    const viewport = viewportRef.current;
+    let nextOffset = offset;
+    if (viewport && clientX != null && clientY != null && zoom > 0) {
+      const bounds = viewport.getBoundingClientRect();
+      const pointerX = clientX - bounds.left - bounds.width / 2;
+      const pointerY = clientY - bounds.top - bounds.height / 2;
+      const ratio = nextZoom / zoom;
+      nextOffset = {
+        x: pointerX - (pointerX - offset.x) * ratio,
+        y: pointerY - (pointerY - offset.y) * ratio,
+      };
+    } else if (zoom > 0) {
+      const ratio = nextZoom / zoom;
+      nextOffset = { x: offset.x * ratio, y: offset.y * ratio };
+    }
+    setZoom(nextZoom);
+    setOffset(clampOffset(nextOffset, nextZoom));
+  }, [clampOffset, offset, zoom]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || video) return;
+    const handleNativeWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      applyZoom(zoom + (event.deltaY < 0 ? 0.25 : -0.25), event.clientX, event.clientY);
+    };
+    viewport.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", handleNativeWheel);
+  }, [applyZoom, video, zoom]);
+
+  const zoomOut = () => applyZoom(zoom - 0.5);
+  const zoomIn = () => applyZoom(zoom + 0.5);
+  const resetZoom = () => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  };
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (video || zoom <= 1 || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: offset.x, originY: offset.y };
+    setDragging(true);
+  };
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setOffset(clampOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    }, zoom));
+  };
+  const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+    setDragging(false);
+  };
 
   return (
     <div role="dialog" aria-modal="true" aria-label={video ? "Full-screen studio video" : "Full-screen portrait"} className="fixed inset-0 z-[110] bg-[#241C16]">
@@ -1209,12 +1284,26 @@ function FullScreenPreview({ image, video, onClose }: { image: string; video?: s
         {video ? (
           <video src={video} poster={image} controls autoPlay preload="metadata" playsInline className="max-h-full max-w-full object-contain" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center overflow-hidden">
-            <PreviewImage
+          <div
+            ref={viewportRef}
+            className={`flex h-full w-full touch-none items-center justify-center overflow-hidden ${zoom > 1 ? dragging ? "cursor-grabbing" : "cursor-grab" : "cursor-default"}`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+            aria-label={zoom > 1 ? "Zoomed portrait. Drag to inspect other areas." : "Portrait preview"}
+          >
+            {/* Shopify media URLs are dynamic and cannot be enumerated in next.config. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={fullScreenImageRef}
               src={image}
               alt="Full-screen portrait"
-              className="max-h-full max-w-full object-contain transition-transform duration-200 ease-out"
-              style={{ transform: `scale(${zoom})` }}
+              width={799}
+              height={1200}
+              draggable="false"
+              className="pointer-events-none max-h-full max-w-full select-none object-contain"
+              style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`, transition: dragging ? "none" : "transform 180ms ease-out" }}
             />
           </div>
         )}
@@ -1223,7 +1312,7 @@ function FullScreenPreview({ image, video, onClose }: { image: string; video?: s
       {!video ? (
         <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-[8px] border border-white/15 bg-black/60 p-1.5 text-white shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur">
           <button type="button" onClick={zoomOut} disabled={zoom <= 1} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom out"><Minus size={18} aria-hidden="true" /></button>
-          <button type="button" onClick={() => setZoom(1)} className="min-h-11 min-w-[72px] rounded-[6px] px-3 text-sm font-semibold tabular-nums hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Reset zoom to 100 percent">{Math.round(zoom * 100)}%</button>
+          <button type="button" onClick={resetZoom} className="min-h-11 min-w-[72px] rounded-[6px] px-3 text-sm font-semibold tabular-nums hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Reset zoom to 100 percent">{Math.round(zoom * 100)}%</button>
           <button type="button" onClick={zoomIn} disabled={zoom >= 3} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom in"><Plus size={18} aria-hidden="true" /></button>
         </div>
       ) : null}
