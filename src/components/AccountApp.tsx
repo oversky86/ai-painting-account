@@ -288,6 +288,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   };
 
   const usesAccountFooter = !loading && Boolean(customer);
+  const accountUnavailable = !loading && (Boolean(error) || !customer);
   const footerContext = detailOpen
     ? "order-detail"
     : activeView === "account"
@@ -297,10 +298,10 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   return (
     <div className="flex min-h-screen flex-col bg-[#FBF8F3] text-[#2D241B]">
       <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={flowEntryUrl} cartUrl={cartUrl} cached={flowCached} />
-      <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 pt-[88px] sm:px-6 lg:px-10 ${usesAccountFooter ? "pb-12" : "pb-[120px]"} ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}>
+      <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 sm:px-6 lg:px-10 ${accountUnavailable ? "flex flex-col justify-center py-12 lg:py-16" : `${usesAccountFooter ? "pb-12" : "pb-[120px]"} pt-[88px] ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}`}>
         {loading ? <p className="min-h-[240px] text-sm text-[#5F564B]" aria-live="polite">Loading your workspace…</p> : null}
-        {!loading && (error || !customer) ? (
-          <section className="min-h-[240px] rounded-[8px] border border-[#DCCFBC] bg-white p-6">
+        {accountUnavailable ? (
+          <section className="rounded-[8px] border border-[#DCCFBC] bg-white p-6 lg:p-8">
             <h1 className="text-2xl font-semibold">Unable to load account</h1>
             <p className="mt-3 text-sm text-[#5F564B]">{error || "Please sign in again."}</p>
             <a href={loginHref("/orders")} className="mt-6 inline-flex min-h-12 items-center rounded-[8px] bg-[#31271F] px-6 text-white">Sign in</a>

@@ -95,6 +95,11 @@ a {
   font-size: 16px;
 }
 
+.gift-message-action {
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .gift-message-dialog__control:focus-visible {
   border-color: #241c16;
   outline: none;

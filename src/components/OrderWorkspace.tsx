@@ -80,7 +80,7 @@ function displayOrderNumber(order: AccountOrder) {
 
 function stageBadgeClasses(stage: OrderStage) {
   const green = stage === "review" || stage === "shipping" || stage === "complete";
-  return `inline-flex min-h-[34px] items-center justify-center rounded-[6px] border px-5 text-[13px] font-semibold ${
+  return `inline-flex min-h-[34px] items-center justify-center whitespace-nowrap rounded-[6px] border px-4 text-[13px] font-semibold ${
     green
       ? "border-[#97CDAA] bg-[#E9F6EE] text-[#2F7D46]"
       : "border-[#E1CCAC] bg-[#FAF4EA] text-[#63523A]"
@@ -258,7 +258,7 @@ function OrderListCard({
                 onChange={(event) => { void handleGiftToggle(event.currentTarget.checked); }}
                 className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               />
-              <span className="pointer-events-none relative block h-6 w-10 rounded-full bg-[#C9BDAA] transition-colors peer-checked:bg-[#31271F] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#31271F] peer-disabled:opacity-50" aria-hidden="true">
+              <span className="pointer-events-none relative block h-6 w-10 rounded-full bg-[#C9BDAA] transition-colors peer-checked:bg-[#A58964] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#31271F] peer-disabled:opacity-50" aria-hidden="true">
                 <span className={`pointer-events-none absolute top-[3px] block h-[18px] w-[18px] rounded-full bg-[#FFFDFB] shadow-[0_1px_4px_rgba(49,39,31,0.24)] transition-transform ${hasGiftMessage ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
               </span>
             </label>
@@ -270,10 +270,10 @@ function OrderListCard({
               <button
                 type="button"
                 onClick={openGiftMessage}
-                disabled={!order.canEditGift || busy}
-                className="min-h-11 px-1 text-[13px] font-semibold text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={busy}
+                className="gift-message-action min-h-11 px-1 text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Edit
+                {order.canEditGift ? "Edit" : "View"}
               </button>
             ) : <span aria-hidden="true" />}
           </div>
@@ -287,6 +287,7 @@ function OrderListCard({
           senderPlaceholder={senderPlaceholder}
           busy={busy}
           error={giftError}
+          readOnly={!order.canEditGift}
           onClose={() => setGiftOpen(false)}
           onSave={async (message) => {
             setGiftError("");
@@ -358,15 +359,13 @@ function OrderDetail({
       <button type="button" onClick={onBack} className="relative -top-4 inline-flex min-h-11 items-center gap-1 text-[13px] text-[#66594E] hover:text-[#241C16] lg:top-0">
         <ArrowLeft size={15} aria-hidden="true" /> Back to all orders
       </button>
-      <div className="-mt-3 lg:mt-0 lg:flex lg:items-center lg:gap-6">
-        <div>
-          <h2 id="order-detail-title" className="text-[30px] font-semibold leading-9 text-[#2B211C] lg:text-[34px] lg:leading-[49px]">
-            <span className="lg:hidden">Order</span>
-            <span className="hidden lg:inline">Order {displayOrderNumber(order)}</span>
+      <div className="-mt-3 flex items-center justify-between gap-3 lg:mt-0 lg:justify-start lg:gap-6">
+        <div className="min-w-0">
+          <h2 id="order-detail-title" className="truncate whitespace-nowrap text-[24px] font-semibold leading-8 text-[#2B211C] lg:text-[34px] lg:leading-[49px]">
+            Order # {displayOrderNumber(order)}
           </h2>
-          <p className="mt-1 text-[15px] font-medium text-[#6C6054] lg:hidden">{displayOrderNumber(order)}</p>
         </div>
-        <span className={`${stageBadgeClasses(order.orderStage)} mt-5 lg:mt-0`}>{stageLabels[order.orderStage]}</span>
+        <span className={`${stageBadgeClasses(order.orderStage)} shrink-0`}>{stageLabels[order.orderStage]}</span>
       </div>
 
       <OrderProgress stage={order.orderStage} />
@@ -392,6 +391,7 @@ function OrderDetail({
 
       {approvalOpen ? (
         <ApprovalDialog
+          image={image}
           busy={busy}
           error={error}
           onClose={() => setApprovalOpen(false)}
@@ -470,12 +470,12 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
         <div>
           <PreviewSurface image={image} video={isVideo ? order.media.videoUrl : undefined} onExpand={() => setFullScreen(true)} />
         </div>
-        <aside>
+        <aside className="lg:flex lg:min-h-0 lg:flex-col">
           <MediaTabs order={order} selected={asset} onSelect={setAsset} />
-          <div className="mt-6 border-t border-[#E7DCCC] pt-6 lg:mt-6">
+          <div className="mt-6 border-t border-[#E7DCCC] pt-6 lg:flex lg:flex-1 lg:flex-col">
             <h4 className="text-base font-bold">Decision</h4>
             <p className="mt-3 text-sm leading-[22px] text-[#6C6054]">Approve the portrait for shipment, or open the modification page to mark requested changes.</p>
-            <div className="mt-7 grid gap-3 lg:mt-[169px]">
+            <div className="mt-7 grid gap-3 lg:mt-auto">
               <button type="button" onClick={onApprove} className={buttonPrimary}>Approve Portrait</button>
               {order.canModify ? (
                 <button type="button" onClick={onModify} className={buttonSecondary}>Ask for Modification</button>
@@ -599,7 +599,7 @@ function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selecte
     { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
     { id: "video" as const, label: "Studio Video", image: order.media.videoPosterUrl || artworkUrl(order), video: true },
   ];
-  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[2/3] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={24} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
+  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[5/6] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={24} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
 }
 
 function PreviewSurface({ image, video, onExpand }: { image: string; video?: string; onExpand?: () => void }) {
@@ -681,7 +681,6 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSubmit }: { image: string; initialNotes: ModificationNote[]; busy: boolean; error: string; onCancel: () => void; onSubmit: (notes: ModificationNote[]) => Promise<void> }) {
   const [notes, setNotes] = useState<ModificationNote[]>(initialNotes);
-  const [selecting, setSelecting] = useState(false);
   const [draft, setDraft] = useState<ModificationSelection | null>(null);
   const [pendingSelection, setPendingSelection] = useState<ModificationSelection | null>(null);
   const [pendingText, setPendingText] = useState("");
@@ -700,9 +699,9 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
   };
 
   useEffect(() => {
-    if (!selecting || pendingSelection) return;
+    if (pendingSelection) return;
     canvasRef.current?.focus();
-  }, [pendingSelection, selecting]);
+  }, [pendingSelection]);
 
   const point = (event: ReactPointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -714,7 +713,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     };
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!selecting || pendingSelection || event.button !== 0) return;
+    if (pendingSelection || event.button !== 0) return;
     event.preventDefault();
     const next = point(event);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -725,7 +724,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
-    if (!selecting || !start) return;
+    if (!start) return;
     const next = point(event);
     const selection = { x: Math.min(start.x, next.x), y: Math.min(start.y, next.y), width: Math.abs(next.x - start.x), height: Math.abs(next.y - start.y) };
     draftRef.current = selection;
@@ -747,7 +746,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     setDraft(null);
   };
   const onCanvasKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!selecting || pendingSelection) return;
+    if (pendingSelection) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     setPendingSelection({ x: 25, y: 25, width: 50, height: 50 });
@@ -766,7 +765,6 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     ]);
     setPendingSelection(null);
     setPendingText("");
-    setSelecting(false);
   };
   const complete = notes.length > 0 && notes.every((note) => note.text.trim());
   const activeSelection = draft || pendingSelection;
@@ -784,12 +782,12 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     : undefined;
 
   return (
-    <div className="lg:fixed lg:inset-0 lg:z-50 lg:flex lg:items-center lg:justify-center lg:bg-black/50 lg:p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 lg:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="modification-workspace-title"
-        className="rounded-[8px] border border-[#DAC9B2] bg-white p-[15px] lg:relative lg:h-[min(868px,calc(100dvh-48px))] lg:w-full lg:max-w-[1110px] lg:overflow-y-auto lg:border-[#DCCFBC] lg:bg-[#FBF8F3] lg:p-0 lg:shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
+        className="h-full w-full overflow-y-auto bg-white p-[15px] lg:relative lg:h-[min(868px,calc(100dvh-48px))] lg:max-w-[1110px] lg:rounded-[8px] lg:border lg:border-[#DCCFBC] lg:bg-[#FBF8F3] lg:p-0 lg:shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
       >
         <header className="relative lg:h-[71px] lg:border-b lg:border-[#DCCFBC]">
           <h2
@@ -808,18 +806,11 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
           </button>
         </header>
 
-        <div className="hidden h-[56px] items-center gap-[10px] rounded-[8px] border border-[#D8C8B6] bg-[#FBF8F3] pr-3 text-[14px] leading-[22px] text-[#4F443A] lg:mx-[31px] lg:mt-[25px] lg:flex">
-          <button
-            type="button"
-            onClick={() => {
-              if (pendingSelection) return;
-              setSelecting((current) => !current);
-            }}
-            aria-pressed={selecting}
-            className={`ml-[9px] inline-flex h-9 w-[120px] shrink-0 items-center justify-center rounded-[4px] border font-medium transition-colors ${selecting ? "border-[#D8563A] bg-[#D8563A] text-white" : "border-[#33251D] bg-[#33251D] text-white"}`}
-          >
-            Select area
-          </button>
+        <p className="mt-3 text-[14px] leading-[20px] text-[#6F6055] lg:hidden">
+          Drag on the portrait to select an area. Add your modification note beside the selected area.
+        </p>
+
+        <div className="hidden h-[56px] items-center rounded-[8px] border border-[#D8C8B6] bg-[#FBF8F3] px-4 text-[14px] leading-[22px] text-[#4F443A] lg:mx-[31px] lg:mt-[25px] lg:flex">
           Drag on the portrait to select an area. Add your modification note beside the selected area.
         </div>
 
@@ -833,9 +824,9 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               onPointerCancel={onPointerCancel}
               onKeyDown={onCanvasKeyDown}
               role="application"
-              tabIndex={selecting ? 0 : -1}
-              aria-label={selecting ? "Draw a rectangular modification area on the portrait" : "Select area to enable portrait annotation"}
-              className={`relative w-full touch-none overflow-hidden rounded-[8px] select-none lg:rounded-none ${imageIsWideForDesktopCanvas ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"} ${selecting && !pendingSelection ? "cursor-crosshair ring-2 ring-[#2F9E5F]/20" : "cursor-default"}`}
+              tabIndex={0}
+              aria-label="Draw a rectangular modification area on the portrait"
+              className={`relative w-full touch-none overflow-hidden rounded-[8px] select-none lg:rounded-none ${imageIsWideForDesktopCanvas ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"} ${pendingSelection ? "cursor-default" : "cursor-crosshair ring-2 ring-[#2F9E5F]/20"}`}
               style={{ aspectRatio: imageAspectRatio }}
             >
               {image ? <PreviewImage src={image} alt="Portrait to annotate" className="h-full w-full rounded-[8px] object-contain lg:rounded-none" onLoad={handleImageLoad} /> : null}
@@ -863,16 +854,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               onSend={sendPending}
               className="lg:hidden"
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSelecting((current) => !current)}
-              aria-pressed={selecting}
-              className={`inline-flex min-h-11 w-full items-center justify-center rounded-[7px] border text-[15px] font-semibold lg:hidden ${selecting ? "border-[#D8563A] bg-[#D8563A] text-white" : "border-[#33251D] bg-[#33251D] text-white"}`}
-            >
-              Select area
-            </button>
-          )}
+          ) : null}
 
           <div className="border-t border-[#E5DCCF] pt-5 lg:border-0 lg:pt-0">
             <h3 className="flex items-center gap-2 text-[22px] font-bold leading-[30px] text-[#2A201C] lg:font-semibold lg:text-[#2B211B]">
@@ -1035,7 +1017,7 @@ function AnnotatedImage({
   return <div className={`relative overflow-hidden rounded-[6px] bg-[#EFE8DD] ${className}`}>{src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-cover" /> : null}<SelectionOverlays notes={notes} activeId={activeId} /></div>;
 }
 
-function ApprovalDialog({ busy, error, onClose, onConfirm }: { busy: boolean; error: string; onClose: () => void; onConfirm: () => Promise<void> }) {
+function ApprovalDialog({ image, busy, error, onClose, onConfirm }: { image: string; busy: boolean; error: string; onClose: () => void; onConfirm: () => Promise<void> }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
       <div
@@ -1056,21 +1038,25 @@ function ApprovalDialog({ busy, error, onClose, onConfirm }: { busy: boolean; er
         </h2>
         <p
           id="approval-confirmation-description"
-          className="mt-4 text-[15px] leading-[22px] text-[#6F6055] lg:mt-[18px] lg:min-h-[48px] lg:text-[14px] lg:leading-5 lg:text-[#66594E]"
+          className="mt-4 text-[15px] leading-[22px] text-[#6F6055] lg:mt-[18px] lg:text-[14px] lg:leading-5 lg:text-[#66594E]"
         >
-          Approval locks revision requests and moves this order to shipment preparation.
+          Confirm that this is the final portrait you want us to prepare for shipment.
         </p>
-        <div className="mt-6 min-h-[106px] rounded-[6px] border border-[#DCCFBC] bg-[rgba(243,235,222,0.52)] px-[15px] pt-[19px] lg:mt-[17px] lg:min-h-[90px] lg:rounded-[8px] lg:px-[17px] lg:pt-[15px]">
-          <p className="text-[16px] font-semibold leading-[19px] text-[#2A201C] lg:text-[14px] lg:leading-5 lg:text-[#2B211C]">
-            AFTER APPROVAL
-          </p>
-          <p className="mt-2 max-w-[250px] text-[14px] leading-5 text-[#6F6055] lg:mt-[6px] lg:max-w-none lg:text-[12px] lg:leading-[17px] lg:text-[#66594E]">
-            <span className="lg:hidden">The studio will prepare the approved portrait for shipment.</span>
-            <span className="hidden lg:inline">Revision requests will close The studio will prepare the approved portrait for shipment. Tracking details will be sent once it ships.</span>
-          </p>
+        <div className="mt-5 flex items-center gap-4 rounded-[7px] border border-[#31271F] bg-white p-3">
+          <div className="h-20 w-16 shrink-0 overflow-hidden rounded-[5px] bg-[#EFE8DD]">
+            {image ? <PreviewImage src={image} alt="Portrait selected for final approval" className="h-full w-full object-cover" /> : null}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold leading-4 tracking-[1px] text-[#806E5A]">YOU&apos;RE APPROVING</p>
+            <p className="mt-1 text-[16px] font-semibold leading-5 text-[#2A201C]">This portrait as the final artwork</p>
+            <p className="mt-1 text-[12px] leading-[17px] text-[#6F6055]">Confirm the version shown here.</p>
+          </div>
         </div>
+        <p className="mt-4 text-[12px] leading-[18px] text-[#6F6055]">
+          <strong className="font-semibold text-[#4A3D34]">After approval:</strong> Revision requests close and the studio begins shipment preparation. Tracking is sent once it ships.
+        </p>
         {error ? <p role="alert" className="mt-3 text-sm text-[#B42318]">{error}</p> : null}
-        <div className="mt-6 grid gap-[14px] lg:mt-[39px] lg:grid-cols-2 lg:gap-4">
+        <div className="mt-6 grid gap-[14px] lg:mt-7 lg:grid-cols-2 lg:gap-4">
           <button
             type="button"
             disabled={busy}
@@ -1325,6 +1311,7 @@ function GiftMessageDialog({
   senderPlaceholder,
   busy,
   error,
+  readOnly,
   onClose,
   onSave,
 }: {
@@ -1332,6 +1319,7 @@ function GiftMessageDialog({
   senderPlaceholder: string;
   busy: boolean;
   error: string;
+  readOnly: boolean;
   onClose: () => void;
   onSave: (message: GiftMessage) => Promise<void>;
 }) {
@@ -1361,12 +1349,16 @@ function GiftMessageDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="gift-message-title"
-        className="mx-auto max-h-[calc(100dvh-32px)] w-full max-w-[1040px] overflow-y-auto overscroll-contain rounded-[8px] border border-[#DCCFBC] bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] sm:max-h-[calc(100dvh-48px)]"
+        className={`mx-auto max-h-[calc(100dvh-32px)] w-full overflow-y-auto overscroll-contain rounded-[8px] border border-[#DCCFBC] bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] sm:max-h-[calc(100dvh-48px)] ${readOnly ? "max-w-[640px]" : "max-w-[1040px]"}`}
       >
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:px-8 lg:py-5">
           <div>
-            <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16] lg:text-2xl">Add a gift message</h2>
-            <p className="mt-1 text-xs text-[#776A5D] lg:text-sm">A printed card will be included with the portrait.</p>
+            <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16] lg:text-2xl">
+              {readOnly ? "Gift message" : initialMessage ? "Edit gift message" : "Add a gift message"}
+            </h2>
+            <p className="mt-1 text-xs text-[#776A5D] lg:text-sm">
+              {readOnly ? "This message was included with the portrait." : "A printed card will be included with the portrait."}
+            </p>
           </div>
           <button
             type="button"
@@ -1379,8 +1371,8 @@ function GiftMessageDialog({
           </button>
         </header>
 
-        <div className="grid lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
-          <aside className="border-b border-[#E0D1BD] bg-[#F2E8DB] p-5 lg:border-b-0 lg:border-r lg:p-8">
+        <div className={readOnly ? "block" : "grid lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]"}>
+          <aside className={`bg-[#F2E8DB] p-5 lg:p-8 ${readOnly ? "" : "border-b border-[#E0D1BD] lg:border-b-0 lg:border-r"}`}>
             <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-[#776A5D]">
               <span>Card preview</span>
               <span className="flex items-center gap-1.5 normal-case tracking-normal text-[#8A5A68]"><span className="h-1.5 w-1.5 rounded-full bg-[#A85F70]" />Live</span>
@@ -1401,9 +1393,20 @@ function GiftMessageDialog({
                 </div>
               </div>
             </div>
+            {readOnly ? (
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="ui-outline-control min-h-12 min-w-[112px] rounded-[8px] border border-[#D8CBB8] bg-white px-5 text-sm font-semibold text-[#31271F] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            ) : null}
           </aside>
 
-          <form
+          {!readOnly ? <form
             className="space-y-5 p-5 pb-0 lg:p-8"
             onSubmit={(event) => {
               event.preventDefault();
@@ -1464,7 +1467,7 @@ function GiftMessageDialog({
                 {busy ? "Saving..." : "Add Gift Message"}
               </button>
             </div>
-          </form>
+          </form> : null}
         </div>
       </section>
     </div>

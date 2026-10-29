@@ -141,7 +141,12 @@ export function createDesignPreviewOrder(stage: OrderStage, hasVersionHistory = 
             estimatedDeliveryAt: "2026-08-28T12:00:00.000Z",
           }
         : null,
-    giftMessage: null,
+    giftMessage: stage === "complete" ? {
+      title: "A gift for you",
+      sender: "Ryan",
+      recipient: "Milo",
+      message: "Made especially for you.",
+    } : null,
     shippingAddress: designPreviewCustomer.defaultAddress,
     media: {
       paintingUrl: "/viewbrush-order-preview.webp",
