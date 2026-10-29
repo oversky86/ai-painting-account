@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
+  SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import {
   ArrowLeft,
+  ExternalLink,
   Gift,
   History,
   ImageIcon,
@@ -30,6 +32,7 @@ import type {
 } from "@/lib/types";
 
 type ReviewAction = "approve" | "modify";
+type MediaAsset = "final" | "reference" | "video";
 
 type OrderWorkspaceProps = {
   orders: AccountOrder[];
@@ -77,7 +80,7 @@ function displayOrderNumber(order: AccountOrder) {
 
 function stageBadgeClasses(stage: OrderStage) {
   const green = stage === "review" || stage === "shipping" || stage === "complete";
-  return `inline-flex min-h-[34px] items-center justify-center rounded-[6px] border px-5 text-[13px] font-semibold ${
+  return `inline-flex min-h-[34px] items-center justify-center whitespace-nowrap rounded-[6px] border px-4 text-[13px] font-semibold ${
     green
       ? "border-[#97CDAA] bg-[#E9F6EE] text-[#2F7D46]"
       : "border-[#E1CCAC] bg-[#FAF4EA] text-[#63523A]"
@@ -183,14 +186,38 @@ function OrderListCard({
 }) {
   const [giftOpen, setGiftOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [giftError, setGiftError] = useState("");
   const image = artworkUrl(order);
+  const hasGiftMessage = Boolean(order.giftMessage);
   const primaryLabel = order.orderStage === "review" ? "Review Portrait" : "View Order";
+
+  const openGiftMessage = () => {
+    setGiftError("");
+    setGiftOpen(true);
+  };
+
+  const handleGiftToggle = async (enabled: boolean) => {
+    setGiftError("");
+    if (enabled) {
+      setGiftOpen(true);
+      return;
+    }
+    if (!hasGiftMessage || busy) return;
+    setBusy(true);
+    try {
+      await onSaveGift(order, null);
+    } catch {
+      setGiftError("We couldn't remove the gift message. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
       <article className="rounded-[8px] border border-[#DCCFBC] bg-white/85 p-4 shadow-[0_18px_38px_rgba(43,31,21,0.05)] lg:grid lg:min-h-[196px] lg:grid-cols-[148px_minmax(0,1fr)_260px] lg:items-center lg:gap-5 lg:p-6">
-        <div className="grid grid-cols-[108px_minmax(0,1fr)] gap-6 lg:block">
-          <div className="h-[108px] w-[108px] overflow-hidden rounded-[6px] border border-[#DCCFBC] bg-[#F3EBDE] lg:h-[148px] lg:w-[148px] lg:rounded-[8px]">
+        <div className="grid grid-cols-[116px_minmax(0,1fr)] gap-6 lg:block">
+          <div className="h-[116px] w-[116px] overflow-hidden rounded-[6px] border border-[#DCCFBC] bg-[#F3EBDE] lg:h-[148px] lg:w-[148px] lg:rounded-[8px]">
             {image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image} alt={`${order.media.conceptTitle || "Custom"} portrait`} width={148} height={148} className="h-full w-full object-cover" />
@@ -218,10 +245,39 @@ function OrderListCard({
 
         <div className="mt-5 grid gap-3 border-t border-[#E5DCCF] pt-5 lg:mt-0 lg:border-0 lg:p-0">
           <button type="button" onClick={onOpen} className={buttonPrimary}>{primaryLabel}</button>
-          <button type="button" onClick={() => setGiftOpen(true)} disabled={!order.canEditGift || busy} className={`${buttonSecondary} gap-2`}>
-            <Gift size={16} aria-hidden="true" />
-            {order.giftMessage ? "Edit Gift Message" : "Add Gift Message"}
-          </button>
+          <div
+            className={`grid min-h-[52px] grid-cols-[52px_minmax(0,1fr)_52px] items-center rounded-[8px] border bg-white transition-colors ${hasGiftMessage ? "border-[#B6A48C] bg-[#FCF8F3]" : "border-[#DCCFBC]"}`}
+            aria-busy={busy}
+          >
+            <label className="relative flex min-h-11 min-w-11 items-center justify-center rounded-[7px]" aria-label={hasGiftMessage ? "Remove gift message" : "Include gift message"}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={hasGiftMessage}
+                disabled={!order.canEditGift || busy}
+                onChange={(event) => { void handleGiftToggle(event.currentTarget.checked); }}
+                className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              />
+              <span className="pointer-events-none relative block h-6 w-10 rounded-full bg-[#C9BDAA] transition-colors peer-checked:bg-[#A58964] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#31271F] peer-disabled:opacity-50" aria-hidden="true">
+                <span className={`pointer-events-none absolute top-[3px] block h-[18px] w-[18px] rounded-full bg-[#FFFDFB] shadow-[0_1px_4px_rgba(49,39,31,0.24)] transition-transform ${hasGiftMessage ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
+              </span>
+            </label>
+            <span className="flex min-w-0 items-center justify-center gap-2 px-2 text-[#2D241B]">
+              <Gift size={16} className="shrink-0 text-[#6E6254]" aria-hidden="true" />
+              <strong className="truncate text-sm font-semibold">Gift Message</strong>
+            </span>
+            {hasGiftMessage ? (
+              <button
+                type="button"
+                onClick={openGiftMessage}
+                disabled={busy}
+                className="gift-message-action min-h-11 px-1 text-[#6B563C] underline decoration-1 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {order.canEditGift ? "Edit" : "View"}
+              </button>
+            ) : <span aria-hidden="true" />}
+          </div>
+          {giftError && !giftOpen ? <p className="text-xs leading-5 text-[#A33A32]" role="alert">{giftError}</p> : null}
         </div>
       </article>
 
@@ -230,12 +286,17 @@ function OrderListCard({
           initialMessage={order.giftMessage}
           senderPlaceholder={senderPlaceholder}
           busy={busy}
+          error={giftError}
+          readOnly={!order.canEditGift}
           onClose={() => setGiftOpen(false)}
           onSave={async (message) => {
+            setGiftError("");
             setBusy(true);
             try {
               await onSaveGift(order, message);
               setGiftOpen(false);
+            } catch {
+              setGiftError("We couldn't save the gift message. Please try again.");
             } finally {
               setBusy(false);
             }
@@ -298,15 +359,13 @@ function OrderDetail({
       <button type="button" onClick={onBack} className="relative -top-4 inline-flex min-h-11 items-center gap-1 text-[13px] text-[#66594E] hover:text-[#241C16] lg:top-0">
         <ArrowLeft size={15} aria-hidden="true" /> Back to all orders
       </button>
-      <div className="-mt-3 lg:mt-0 lg:flex lg:items-center lg:gap-6">
-        <div>
-          <h2 id="order-detail-title" className="text-[30px] font-semibold leading-9 text-[#2B211C] lg:text-[34px] lg:leading-[49px]">
-            <span className="lg:hidden">Order</span>
-            <span className="hidden lg:inline">Order {displayOrderNumber(order)}</span>
+      <div className="-mt-3 flex items-center justify-between gap-3 lg:mt-0 lg:justify-start lg:gap-6">
+        <div className="min-w-0">
+          <h2 id="order-detail-title" className="truncate whitespace-nowrap text-[24px] font-semibold leading-8 text-[#2B211C] lg:text-[34px] lg:leading-[49px]">
+            Order # {displayOrderNumber(order)}
           </h2>
-          <p className="mt-1 text-[15px] font-medium text-[#6C6054] lg:hidden">{displayOrderNumber(order)}</p>
         </div>
-        <span className={`${stageBadgeClasses(order.orderStage)} mt-5 lg:mt-0`}>{stageLabels[order.orderStage]}</span>
+        <span className={`${stageBadgeClasses(order.orderStage)} shrink-0`}>{stageLabels[order.orderStage]}</span>
       </div>
 
       <OrderProgress stage={order.orderStage} />
@@ -332,6 +391,7 @@ function OrderDetail({
 
       {approvalOpen ? (
         <ApprovalDialog
+          image={image}
           busy={busy}
           error={error}
           onClose={() => setApprovalOpen(false)}
@@ -410,12 +470,12 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
         <div>
           <PreviewSurface image={image} video={isVideo ? order.media.videoUrl : undefined} onExpand={() => setFullScreen(true)} />
         </div>
-        <aside>
+        <aside className="lg:flex lg:min-h-0 lg:flex-col">
           <MediaTabs order={order} selected={asset} onSelect={setAsset} />
-          <div className="mt-6 border-t border-[#E7DCCC] pt-6 lg:mt-6">
+          <div className="mt-6 border-t border-[#E7DCCC] pt-6 lg:flex lg:flex-1 lg:flex-col">
             <h4 className="text-base font-bold">Decision</h4>
             <p className="mt-3 text-sm leading-[22px] text-[#6C6054]">Approve the portrait for shipment, or open the modification page to mark requested changes.</p>
-            <div className="mt-7 grid gap-3 lg:mt-[169px]">
+            <div className="mt-7 grid gap-3 lg:mt-auto">
               <button type="button" onClick={onApprove} className={buttonPrimary}>Approve Portrait</button>
               {order.canModify ? (
                 <button type="button" onClick={onModify} className={buttonSecondary}>Ask for Modification</button>
@@ -434,7 +494,10 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
 }
 
 function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: () => void }) {
-  const image = artworkUrl(order);
+  const [asset, setAsset] = useState<MediaAsset>("final");
+  const [fullScreen, setFullScreen] = useState(false);
+  const image = selectedMediaImage(order, asset);
+  const isVideo = asset === "video" && Boolean(order.media.videoUrl);
   const hasVersionHistory =
     order.modificationNotes.length > 0 ||
     order.artworkVersions.length > 1 ||
@@ -449,12 +512,12 @@ function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: (
       <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:p-6">
         <div><h3 className="text-[22px] font-bold">Your Portrait is Approved.</h3><p className="mt-2 text-sm text-[#6C6054]">Artwork changes are no longer available at this stage.</p></div>
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,772px)_340px] lg:gap-10">
-          <PreviewSurface image={image} />
+          <PreviewSurface image={image} video={isVideo ? order.media.videoUrl : undefined} onExpand={() => setFullScreen(true)} />
           <aside className="flex flex-col">
-            <MediaTabs order={order} selected="final" onSelect={() => undefined} />
+            <MediaTabs order={order} selected={asset} onSelect={setAsset} />
             <div className="mt-6 flex flex-1 flex-col border-t border-[#E7DCCC] pt-6">
               <div className="mt-auto grid gap-3">
-                <button type="button" disabled className={`${buttonPrimary} w-full opacity-35`}>Approved</button>
+                <button type="button" disabled className="inline-flex min-h-12 w-full items-center justify-center rounded-[8px] bg-[#AFA8A2] px-5 text-[15px] font-semibold text-white">Approved</button>
                 {hasVersionHistory ? (
                   <button type="button" onClick={onHistory} className={`${buttonSecondary} w-full gap-2`}>
                     <History size={18} aria-hidden="true" />
@@ -466,6 +529,7 @@ function ApprovedPanel({ order, onHistory }: { order: AccountOrder; onHistory: (
           </aside>
         </div>
       </article>
+      {fullScreen && image ? <FullScreenPreview image={image} video={isVideo ? order.media.videoUrl : undefined} onClose={() => setFullScreen(false)} /> : null}
     </>
   );
 }
@@ -476,8 +540,8 @@ function RevisionPanel({ order }: { order: AccountOrder }) {
     <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:p-6">
       <h3 className="text-xl font-bold">Submitted modification request</h3>
       <p className="mt-3 max-w-3xl text-sm leading-[22px] text-[#6C6054]">The artist is revising the portrait based on your notes. You will receive an email when the updated artwork is ready to review.</p>
-      <div className="mt-5 grid gap-6 border-t border-[#E7DCCC] pt-5 lg:grid-cols-[404px_minmax(0,1fr)]">
-        <AnnotatedImage src={artworkUrl(order)} notes={notes} />
+      <div className="mt-5 grid gap-6 border-t border-[#E7DCCC] pt-5 lg:grid-cols-[minmax(0,772px)_minmax(0,1fr)] lg:gap-10">
+        <AnnotatedImage src={artworkUrl(order)} notes={notes} fit="review" />
         <div><h4 className="text-base font-bold">Modification Request</h4><ol className="mt-5 grid gap-3 text-sm text-[#6C6054]">{notes.map((note, index) => <li key={note.id}>#{index + 1} {note.text}</li>)}</ol></div>
       </div>
     </article>
@@ -486,32 +550,56 @@ function RevisionPanel({ order }: { order: AccountOrder }) {
 
 function ShippedPanel({ order }: { order: AccountOrder }) {
   const tracking = order.tracking;
-  const estimate = tracking?.estimatedDeliveryAt
-    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(tracking.estimatedDeliveryAt))
-    : "Pending";
+  const company = tracking?.company || "Not available";
+  const trackingNumber = tracking?.number || "Not available";
+  const trackingUrl = tracking?.number ? tracking.url : "";
   return (
     <>
       <article className="h-[110px] overflow-hidden rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:h-auto lg:p-6"><h3 className="text-lg font-bold lg:text-xl">Your portrait has shipped.</h3><p className="mt-2 text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">This approved portrait has shipped. Changes are no longer available for this order.</p></article>
-      <article className="h-[324px] rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:h-auto lg:min-h-[220px] lg:p-6">
-        <div className="flex items-center justify-between gap-4"><h3 className="text-lg font-bold lg:text-xl">Tracking details</h3><span className="rounded-[6px] border border-[#97CDAA] bg-[#E9F6EE] px-5 py-2 text-xs font-semibold text-[#2F7D46]">{tracking?.status || "In transit"}</span></div>
-        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">The package has left the studio. Track shipment updates from the carrier until delivery is complete.</p>
-        <div className="mt-4 grid gap-4 border-t border-[#E7DCCC] pt-4 text-sm lg:grid-cols-[280px_220px_180px] lg:items-center">
-          <div><p className="text-xs text-[#6C6054]">Tracking #</p><strong className="mt-1 block break-all">{tracking?.number || "Not available"}</strong></div>
-          <div><p className="text-xs text-[#6C6054]">Estimated delivery</p><strong className="mt-1 block">{estimate}</strong></div>
-          {tracking?.url ? <a href={tracking.url} target="_blank" rel="noreferrer" className={`${buttonPrimary} w-full`}>Track</a> : null}
-        </div>
+      <article className="rounded-[8px] border border-[#DAC9B2] bg-white p-4 lg:min-h-[220px] lg:p-6">
+        <h3 className="text-lg font-bold lg:text-xl">Tracking details</h3>
+        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#6C6054] lg:mt-3 lg:text-sm lg:leading-6">Use the tracking number below to view the latest shipment details from the carrier.</p>
+        <dl className="mt-5 grid gap-5 border-t border-[#E7DCCC] pt-5 text-sm sm:grid-cols-2 lg:max-w-[680px] lg:gap-10">
+          <div>
+            <dt className="text-xs font-medium text-[#6C6054]">Carrier</dt>
+            <dd className="mt-2 font-semibold text-[#241C16]">{company}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-[#6C6054]">Tracking Number</dt>
+            <dd className="mt-2 min-w-0">
+              {trackingUrl ? (
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 max-w-full items-center gap-2 break-all font-semibold text-[#5E4936] underline decoration-1 underline-offset-4 hover:text-[#31271F]"
+                  aria-label={`Track shipment ${trackingNumber} with ${company}`}
+                >
+                  <span>{trackingNumber}</span>
+                  <ExternalLink size={14} className="shrink-0" aria-hidden="true" />
+                </a>
+              ) : <span className="font-semibold text-[#241C16]">{trackingNumber}</span>}
+            </dd>
+          </div>
+        </dl>
       </article>
     </>
   );
 }
 
-function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selected: "final" | "reference" | "video"; onSelect: (value: "final" | "reference" | "video") => void }) {
+function selectedMediaImage(order: AccountOrder, asset: MediaAsset) {
+  if (asset === "reference") return order.media.aiPreviewUrl || artworkUrl(order);
+  if (asset === "video") return order.media.videoPosterUrl || artworkUrl(order);
+  return artworkUrl(order);
+}
+
+function MediaTabs({ order, selected, onSelect }: { order: AccountOrder; selected: MediaAsset; onSelect: (value: MediaAsset) => void }) {
   const rows = [
     { id: "final" as const, label: "Final Portrait", image: artworkUrl(order) },
     { id: "reference" as const, label: "AI Reference", image: order.media.aiPreviewUrl || artworkUrl(order) },
     { id: "video" as const, label: "Studio Video", image: order.media.videoPosterUrl || artworkUrl(order), video: true },
   ];
-  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block h-[72px] overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={18} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="block truncate px-2 py-2.5 text-[13px] font-medium">{row.label}</span></button>)}</div>;
+  return <div className="grid grid-cols-3 gap-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`media-tab flex aspect-[5/6] min-w-0 flex-col overflow-hidden rounded-[6px] border bg-[#FCF8F4] text-left transition-colors hover:bg-[#FBF8F3] ${selected === row.id ? "border-[#31271F]" : "border-[#DCCFBC]"}`}><span className="relative block min-h-0 flex-1 overflow-hidden">{row.image ? <PreviewImage src={row.image} alt={`${row.label} thumbnail`} className="h-full w-full object-cover transition-transform duration-200 ease-out" /> : null}{row.video ? <PlayCircle size={24} className="absolute right-2 top-2 rounded bg-[#35261E] p-0.5 text-white" /> : null}</span><span className="flex min-h-10 items-center truncate px-2 py-2 text-[13px] font-medium">{row.label}</span></button>)}</div>;
 }
 
 function PreviewSurface({ image, video, onExpand }: { image: string; video?: string; onExpand?: () => void }) {
@@ -563,9 +651,9 @@ function PreviewSurface({ image, video, onExpand }: { image: string; video?: str
           type="button"
           onClick={() => {videoRef.current?.pause();onExpand();}}
           aria-label={video ? "Open full-screen studio video" : "Open full-screen portrait"}
-          className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[6px] bg-[#35261E]/65 text-white before:absolute before:-inset-1 before:content-[''] hover:bg-[#35261E]/80"
+          className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-[6px] bg-[#35261E]/65 text-white before:absolute before:-inset-1 before:content-[''] hover:bg-[#35261E]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#35261E]"
         >
-          <Maximize2 size={16} aria-hidden="true" />
+          <Maximize2 size={20} aria-hidden="true" />
         </button>
       ) : null}
     </div>
@@ -593,19 +681,27 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSubmit }: { image: string; initialNotes: ModificationNote[]; busy: boolean; error: string; onCancel: () => void; onSubmit: (notes: ModificationNote[]) => Promise<void> }) {
   const [notes, setNotes] = useState<ModificationNote[]>(initialNotes);
-  const [selecting, setSelecting] = useState(false);
   const [draft, setDraft] = useState<ModificationSelection | null>(null);
   const [pendingSelection, setPendingSelection] = useState<ModificationSelection | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [imageAspectRatio, setImageAspectRatio] = useState(799 / 1200);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const draftRef = useRef<ModificationSelection | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const imageIsWideForDesktopCanvas = imageAspectRatio > 608 / 626;
+
+  const handleImageLoad = (event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setImageAspectRatio(naturalWidth / naturalHeight);
+    }
+  };
 
   useEffect(() => {
-    if (!selecting || pendingSelection) return;
+    if (pendingSelection) return;
     canvasRef.current?.focus();
-  }, [pendingSelection, selecting]);
+  }, [pendingSelection]);
 
   const point = (event: ReactPointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -617,7 +713,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     };
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!selecting || pendingSelection || event.button !== 0) return;
+    if (pendingSelection || event.button !== 0) return;
     event.preventDefault();
     const next = point(event);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -628,7 +724,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
-    if (!selecting || !start) return;
+    if (!start) return;
     const next = point(event);
     const selection = { x: Math.min(start.x, next.x), y: Math.min(start.y, next.y), width: Math.abs(next.x - start.x), height: Math.abs(next.y - start.y) };
     draftRef.current = selection;
@@ -650,7 +746,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     setDraft(null);
   };
   const onCanvasKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!selecting || pendingSelection) return;
+    if (pendingSelection) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     setPendingSelection({ x: 25, y: 25, width: 50, height: 50 });
@@ -669,7 +765,6 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     ]);
     setPendingSelection(null);
     setPendingText("");
-    setSelecting(false);
   };
   const complete = notes.length > 0 && notes.every((note) => note.text.trim());
   const activeSelection = draft || pendingSelection;
@@ -687,12 +782,12 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     : undefined;
 
   return (
-    <div className="lg:fixed lg:inset-0 lg:z-50 lg:flex lg:items-center lg:justify-center lg:bg-black/50 lg:p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 lg:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="modification-workspace-title"
-        className="rounded-[8px] border border-[#DAC9B2] bg-white p-[15px] lg:relative lg:h-[min(868px,calc(100dvh-48px))] lg:w-full lg:max-w-[1110px] lg:overflow-y-auto lg:border-[#DCCFBC] lg:bg-[#FBF8F3] lg:p-0 lg:shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
+        className="h-full w-full overflow-y-auto bg-white p-[15px] lg:relative lg:h-[min(868px,calc(100dvh-48px))] lg:max-w-[1110px] lg:rounded-[8px] lg:border lg:border-[#DCCFBC] lg:bg-[#FBF8F3] lg:p-0 lg:shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
       >
         <header className="relative lg:h-[71px] lg:border-b lg:border-[#DCCFBC]">
           <h2
@@ -711,23 +806,16 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
           </button>
         </header>
 
-        <div className="hidden h-[56px] items-center gap-[10px] rounded-[8px] border border-[#D8C8B6] bg-[#FBF8F3] pr-3 text-[14px] leading-[22px] text-[#4F443A] lg:mx-[31px] lg:mt-[25px] lg:flex">
-          <button
-            type="button"
-            onClick={() => {
-              if (pendingSelection) return;
-              setSelecting((current) => !current);
-            }}
-            aria-pressed={selecting}
-            className={`ml-[9px] inline-flex h-9 w-[120px] shrink-0 items-center justify-center rounded-[4px] border font-medium transition-colors ${selecting ? "border-[#D8563A] bg-[#D8563A] text-white" : "border-[#33251D] bg-[#33251D] text-white"}`}
-          >
-            Select area
-          </button>
+        <p className="mt-3 text-[14px] leading-[20px] text-[#6F6055] lg:hidden">
+          Drag on the portrait to select an area. Add your modification note beside the selected area.
+        </p>
+
+        <div className="hidden h-[56px] items-center rounded-[8px] border border-[#D8C8B6] bg-[#FBF8F3] px-4 text-[14px] leading-[22px] text-[#4F443A] lg:mx-[31px] lg:mt-[25px] lg:flex">
           Drag on the portrait to select an area. Add your modification note beside the selected area.
         </div>
 
         <div className="mt-5 grid gap-6 lg:mx-[30px] lg:mt-[23px] lg:grid-cols-[640px_374px] lg:gap-[33px]">
-          <div className="relative aspect-[163/173] overflow-hidden rounded-[8px] bg-[#EFE8DD] lg:h-[658px] lg:w-[640px] lg:aspect-auto lg:px-[70px] lg:py-4">
+          <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:h-[658px] lg:w-[640px]">
             <div
               ref={canvasRef}
               onPointerDown={onPointerDown}
@@ -736,11 +824,12 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               onPointerCancel={onPointerCancel}
               onKeyDown={onCanvasKeyDown}
               role="application"
-              tabIndex={selecting ? 0 : -1}
-              aria-label={selecting ? "Draw a rectangular modification area on the portrait" : "Select area to enable portrait annotation"}
-              className={`relative h-full w-full touch-none overflow-hidden rounded-[8px] select-none lg:overflow-visible lg:rounded-none ${selecting && !pendingSelection ? "cursor-crosshair ring-2 ring-[#2F9E5F]/20" : "cursor-default"}`}
+              tabIndex={0}
+              aria-label="Draw a rectangular modification area on the portrait"
+              className={`relative w-full touch-none overflow-hidden rounded-[8px] select-none lg:rounded-none ${imageIsWideForDesktopCanvas ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"} ${pendingSelection ? "cursor-default" : "cursor-crosshair ring-2 ring-[#2F9E5F]/20"}`}
+              style={{ aspectRatio: imageAspectRatio }}
             >
-              {image ? <PreviewImage src={image} alt="Portrait to annotate" className="h-full w-full rounded-[8px] object-cover lg:rounded-none" /> : null}
+              {image ? <PreviewImage src={image} alt="Portrait to annotate" className="h-full w-full rounded-[8px] object-contain lg:rounded-none" onLoad={handleImageLoad} /> : null}
               <SelectionOverlays notes={overlayNotes} />
               {pendingSelection ? (
                 <PendingModificationEditor
@@ -765,16 +854,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               onSend={sendPending}
               className="lg:hidden"
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSelecting((current) => !current)}
-              aria-pressed={selecting}
-              className={`inline-flex min-h-11 w-full items-center justify-center rounded-[7px] border text-[15px] font-semibold lg:hidden ${selecting ? "border-[#D8563A] bg-[#D8563A] text-white" : "border-[#33251D] bg-[#33251D] text-white"}`}
-            >
-              Select area
-            </button>
-          )}
+          ) : null}
 
           <div className="border-t border-[#E5DCCF] pt-5 lg:border-0 lg:pt-0">
             <h3 className="flex items-center gap-2 text-[22px] font-bold leading-[30px] text-[#2A201C] lg:font-semibold lg:text-[#2B211B]">
@@ -897,11 +977,47 @@ function SelectionOverlays({ notes, activeId }: { notes: ModificationNote[]; act
   return <>{notes.map((note,index) => <span key={note.id} className={`pointer-events-none absolute border-2 ${activeId === note.id ? "border-[#D6534C] bg-[#D6534C]/12" : "border-[#3B9463] bg-[#3B9463]/10"}`} style={{ left:`${note.selection.x}%`, top:`${note.selection.y}%`, width:`${note.selection.width}%`, height:`${note.selection.height}%` }}><span className="absolute right-[-11px] top-1/2 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-white bg-[#D6534C] text-[11px] font-bold text-white">{index+1}</span></span>)}</>;
 }
 
-function AnnotatedImage({ src, notes, activeId, className = "aspect-square" }: { src: string; notes: ModificationNote[]; activeId?: string; className?: string }) {
+function AnnotatedImage({
+  src,
+  notes,
+  activeId,
+  className = "aspect-square",
+  fit = "cover",
+}: {
+  src: string;
+  notes: ModificationNote[];
+  activeId?: string;
+  className?: string;
+  fit?: "cover" | "review";
+}) {
+  const [imageAspectRatio, setImageAspectRatio] = useState(799 / 1200);
+  const imageIsWideForReview = imageAspectRatio > 732 / 466;
+
+  const handleImageLoad = (event: ReactSyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setImageAspectRatio(naturalWidth / naturalHeight);
+    }
+  };
+
+  if (fit === "review") {
+    return (
+      <div className={`relative flex w-full items-center justify-center overflow-hidden rounded-[8px] bg-[#EFE8DD] p-4 lg:h-[506px] lg:p-5 ${className}`}>
+        <div
+          className={`relative w-full overflow-hidden ${imageIsWideForReview ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"}`}
+          style={{ aspectRatio: imageAspectRatio }}
+        >
+          {src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-contain" onLoad={handleImageLoad} /> : null}
+          <SelectionOverlays notes={notes} activeId={activeId} />
+        </div>
+      </div>
+    );
+  }
+
   return <div className={`relative overflow-hidden rounded-[6px] bg-[#EFE8DD] ${className}`}>{src ? <PreviewImage src={src} alt="Portrait with modification annotations" className="h-full w-full object-cover" /> : null}<SelectionOverlays notes={notes} activeId={activeId} /></div>;
 }
 
-function ApprovalDialog({ busy, error, onClose, onConfirm }: { busy: boolean; error: string; onClose: () => void; onConfirm: () => Promise<void> }) {
+function ApprovalDialog({ image, busy, error, onClose, onConfirm }: { image: string; busy: boolean; error: string; onClose: () => void; onConfirm: () => Promise<void> }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
       <div
@@ -922,21 +1038,25 @@ function ApprovalDialog({ busy, error, onClose, onConfirm }: { busy: boolean; er
         </h2>
         <p
           id="approval-confirmation-description"
-          className="mt-4 text-[15px] leading-[22px] text-[#6F6055] lg:mt-[18px] lg:min-h-[48px] lg:text-[14px] lg:leading-5 lg:text-[#66594E]"
+          className="mt-4 text-[15px] leading-[22px] text-[#6F6055] lg:mt-[18px] lg:text-[14px] lg:leading-5 lg:text-[#66594E]"
         >
-          Approval locks revision requests and moves this order to shipment preparation.
+          Confirm that this is the final portrait you want us to prepare for shipment.
         </p>
-        <div className="mt-6 min-h-[106px] rounded-[6px] border border-[#DCCFBC] bg-[rgba(243,235,222,0.52)] px-[15px] pt-[19px] lg:mt-[17px] lg:min-h-[90px] lg:rounded-[8px] lg:px-[17px] lg:pt-[15px]">
-          <p className="text-[16px] font-semibold leading-[19px] text-[#2A201C] lg:text-[14px] lg:leading-5 lg:text-[#2B211C]">
-            AFTER APPROVAL
-          </p>
-          <p className="mt-2 max-w-[250px] text-[14px] leading-5 text-[#6F6055] lg:mt-[6px] lg:max-w-none lg:text-[12px] lg:leading-[17px] lg:text-[#66594E]">
-            <span className="lg:hidden">The studio will prepare the approved portrait for shipment.</span>
-            <span className="hidden lg:inline">Revision requests will close The studio will prepare the approved portrait for shipment. Tracking details will be sent once it ships.</span>
-          </p>
+        <div className="mt-5 flex items-center gap-4 rounded-[7px] border border-[#31271F] bg-white p-3">
+          <div className="h-20 w-16 shrink-0 overflow-hidden rounded-[5px] bg-[#EFE8DD]">
+            {image ? <PreviewImage src={image} alt="Portrait selected for final approval" className="h-full w-full object-cover" /> : null}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold leading-4 tracking-[1px] text-[#806E5A]">YOU&apos;RE APPROVING</p>
+            <p className="mt-1 text-[16px] font-semibold leading-5 text-[#2A201C]">This portrait as the final artwork</p>
+            <p className="mt-1 text-[12px] leading-[17px] text-[#6F6055]">Confirm the version shown here.</p>
+          </div>
         </div>
+        <p className="mt-4 text-[12px] leading-[18px] text-[#6F6055]">
+          <strong className="font-semibold text-[#4A3D34]">After approval:</strong> Revision requests close and the studio begins shipment preparation. Tracking is sent once it ships.
+        </p>
         {error ? <p role="alert" className="mt-3 text-sm text-[#B42318]">{error}</p> : null}
-        <div className="mt-6 grid gap-[14px] lg:mt-[39px] lg:grid-cols-2 lg:gap-4">
+        <div className="mt-6 grid gap-[14px] lg:mt-7 lg:grid-cols-2 lg:gap-4">
           <button
             type="button"
             disabled={busy}
@@ -1042,36 +1162,172 @@ function VersionCard({ version, expanded, onToggle, onNote }: { version: Artwork
 }
 
 function FullScreenPreview({ image, video, onClose }: { image: string; video?: string; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const fullScreenImageRef = useRef<HTMLImageElement>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
+
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
   }, [onClose]);
 
-  return <div role="dialog" aria-modal="true" aria-label={video ? "Full-screen studio video" : "Full-screen portrait"} className="fixed inset-0 z-[80] flex items-center justify-center bg-[#241C16]/95 p-5 lg:p-8"><button type="button" onClick={onClose} className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-[8px] bg-white/10 text-white hover:bg-white/20" aria-label={video ? "Close full-screen studio video" : "Close full-screen portrait"}><X /></button>{video ? <video src={video} poster={image} controls autoPlay preload="metadata" playsInline className="max-h-full max-w-full object-contain" /> : <PreviewImage src={image} alt="Full-screen portrait" className="max-h-full max-w-full object-contain" />}</div>;
+  const clampOffset = useCallback((nextOffset: { x: number; y: number }, nextZoom: number) => {
+    const viewport = viewportRef.current;
+    const previewImage = fullScreenImageRef.current;
+    if (!viewport || !previewImage || nextZoom <= 1) return { x: 0, y: 0 };
+    const maxX = Math.max(0, (previewImage.offsetWidth * nextZoom - viewport.clientWidth) / 2);
+    const maxY = Math.max(0, (previewImage.offsetHeight * nextZoom - viewport.clientHeight) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextOffset.x)),
+      y: Math.min(maxY, Math.max(-maxY, nextOffset.y)),
+    };
+  }, []);
+
+  const applyZoom = useCallback((nextZoomValue: number, clientX?: number, clientY?: number) => {
+    const nextZoom = Math.min(3, Math.max(1, Number(nextZoomValue.toFixed(2))));
+    const viewport = viewportRef.current;
+    let nextOffset = offset;
+    if (viewport && clientX != null && clientY != null && zoom > 0) {
+      const bounds = viewport.getBoundingClientRect();
+      const pointerX = clientX - bounds.left - bounds.width / 2;
+      const pointerY = clientY - bounds.top - bounds.height / 2;
+      const ratio = nextZoom / zoom;
+      nextOffset = {
+        x: pointerX - (pointerX - offset.x) * ratio,
+        y: pointerY - (pointerY - offset.y) * ratio,
+      };
+    } else if (zoom > 0) {
+      const ratio = nextZoom / zoom;
+      nextOffset = { x: offset.x * ratio, y: offset.y * ratio };
+    }
+    setZoom(nextZoom);
+    setOffset(clampOffset(nextOffset, nextZoom));
+  }, [clampOffset, offset, zoom]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || video) return;
+    const handleNativeWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      applyZoom(zoom + (event.deltaY < 0 ? 0.25 : -0.25), event.clientX, event.clientY);
+    };
+    viewport.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", handleNativeWheel);
+  }, [applyZoom, video, zoom]);
+
+  const zoomOut = () => applyZoom(zoom - 0.5);
+  const zoomIn = () => applyZoom(zoom + 0.5);
+  const resetZoom = () => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  };
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (video || zoom <= 1 || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: offset.x, originY: offset.y };
+    setDragging(true);
+  };
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setOffset(clampOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    }, zoom));
+  };
+  const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+    setDragging(false);
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label={video ? "Full-screen studio video" : "Full-screen portrait"} className="fixed inset-0 z-[110] bg-[#241C16]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-[8px] bg-black/55 text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] hover:bg-black/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        aria-label={video ? "Close full-screen studio video" : "Close full-screen portrait"}
+      >
+        <X size={22} aria-hidden="true" />
+      </button>
+
+      <div className="flex h-full w-full items-center justify-center overflow-hidden p-5 pb-24 pt-20 lg:p-8 lg:pb-24 lg:pt-20">
+        {video ? (
+          <video src={video} poster={image} controls autoPlay preload="metadata" playsInline className="max-h-full max-w-full object-contain" />
+        ) : (
+          <div
+            ref={viewportRef}
+            className={`flex h-full w-full touch-none items-center justify-center overflow-hidden ${zoom > 1 ? dragging ? "cursor-grabbing" : "cursor-grab" : "cursor-default"}`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+            aria-label={zoom > 1 ? "Zoomed portrait. Drag to inspect other areas." : "Portrait preview"}
+          >
+            {/* Shopify media URLs are dynamic and cannot be enumerated in next.config. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={fullScreenImageRef}
+              src={image}
+              alt="Full-screen portrait"
+              width={799}
+              height={1200}
+              draggable="false"
+              className="pointer-events-none max-h-full max-w-full select-none object-contain"
+              style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`, transition: dragging ? "none" : "transform 180ms ease-out" }}
+            />
+          </div>
+        )}
+      </div>
+
+      {!video ? (
+        <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-[8px] border border-white/15 bg-black/60 p-1.5 text-white shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur">
+          <button type="button" onClick={zoomOut} disabled={zoom <= 1} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom out"><Minus size={18} aria-hidden="true" /></button>
+          <button type="button" onClick={resetZoom} className="min-h-11 min-w-[72px] rounded-[6px] px-3 text-sm font-semibold tabular-nums hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Reset zoom to 100 percent">{Math.round(zoom * 100)}%</button>
+          <button type="button" onClick={zoomIn} disabled={zoom >= 3} className="flex h-11 w-11 items-center justify-center rounded-[6px] hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-35" aria-label="Zoom in"><Plus size={18} aria-hidden="true" /></button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function GiftMessageDialog({
   initialMessage,
   senderPlaceholder,
   busy,
+  error,
+  readOnly,
   onClose,
   onSave,
 }: {
   initialMessage: GiftMessage | null;
   senderPlaceholder: string;
   busy: boolean;
+  error: string;
+  readOnly: boolean;
   onClose: () => void;
   onSave: (message: GiftMessage) => Promise<void>;
 }) {
-  const [title, setTitle] = useState(initialMessage?.title ?? "Your Title Here");
+  const messageLimit = 240;
+  const [title, setTitle] = useState(initialMessage?.title ?? "A gift for you");
   const [sender, setSender] = useState(initialMessage?.sender ?? "");
   const [recipient, setRecipient] = useState(initialMessage?.recipient ?? "");
   const [message, setMessage] = useState(initialMessage?.message ?? "");
-  const [previewNotice, setPreviewNotice] = useState("");
-  const titleInputRef = useRef<HTMLInputElement>(null);
   const canSave = Boolean(title.trim() && sender.trim() && recipient.trim() && message.trim());
 
   useEffect(() => {
@@ -1081,7 +1337,6 @@ function GiftMessageDialog({
     };
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", closeOnEscape);
-    titleInputRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", closeOnEscape);
@@ -1089,44 +1344,70 @@ function GiftMessageDialog({
   }, [busy, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#241C16]/[0.58] px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-[#241C16]/[0.62] p-4 backdrop-blur-sm sm:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="gift-message-title"
-        className="mx-auto w-full max-w-[980px] overflow-hidden rounded-[8px] border border-[#DCCFBC] bg-[#FBF8F3] shadow-[0_30px_80px_rgba(20,14,10,0.35)]"
+        className={`mx-auto max-h-[calc(100dvh-32px)] w-full overflow-y-auto overscroll-contain rounded-[8px] border border-[#DCCFBC] bg-[#FFFDFB] shadow-[0_30px_80px_rgba(20,14,10,0.35)] sm:max-h-[calc(100dvh-48px)] ${readOnly ? "max-w-[640px]" : "max-w-[1040px]"}`}
       >
-        <header className="flex items-center justify-between border-b border-[#DCCFBC] px-5 py-4">
-          <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16]">Gift Message</h2>
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:px-8 lg:py-5">
+          <div>
+            <h2 id="gift-message-title" className="text-xl font-semibold text-[#241C16] lg:text-2xl">
+              {readOnly ? "Gift message" : initialMessage ? "Edit gift message" : "Add a gift message"}
+            </h2>
+            <p className="mt-1 text-xs text-[#776A5D] lg:text-sm">
+              {readOnly ? "This message was included with the portrait." : "A printed card will be included with the portrait."}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="flex h-11 w-11 items-center justify-center rounded-[8px] p-2 text-[#31271F] transition-colors hover:bg-[#F3EBDE]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-[#31271F] transition-colors hover:bg-[#F3EBDE]"
             aria-label="Close gift message"
           >
-            <X size={24} aria-hidden="true" />
+            <X size={22} aria-hidden="true" />
           </button>
         </header>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[360px_minmax(0,1fr)] lg:p-8">
-          <div className="rounded-[8px] border border-[#DCCFBC] bg-white p-6 shadow-[0_16px_34px_rgba(43,31,21,0.06)]">
-            <div className="min-h-[430px] rounded-[8px] border border-[#EFE4D6] bg-[#FBF8F3] p-7 text-center">
-              <div className="mx-auto h-16 w-28 rounded-full border-t-4 border-[#D7A77C]" aria-hidden="true" />
-              <p className="mt-10 text-2xl font-semibold text-[#7A4A68]">{title || "Your Title Here"}</p>
-              <div className="mt-5 space-y-1 text-sm font-semibold text-[#4F4437]">
-                <p>To: {recipient || "Someone you love"}</p>
-                <p>From: {sender || "Someone I love"}</p>
-              </div>
-              <p className="mx-auto mt-8 max-w-[24ch] whitespace-pre-line text-sm leading-7 text-[#5F564B]">
-                {message || "This hand-painted portrait was created with love just for you."}
-              </p>
-              <p className="mt-10 text-lg font-semibold text-[#7A4A68]">ViewBrush</p>
+        <div className={readOnly ? "block" : "grid lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]"}>
+          <aside className={`bg-[#F2E8DB] p-5 lg:p-8 ${readOnly ? "" : "border-b border-[#E0D1BD] lg:border-b-0 lg:border-r"}`}>
+            <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-[#776A5D]">
+              <span>Card preview</span>
+              <span className="flex items-center gap-1.5 normal-case tracking-normal text-[#8A5A68]"><span className="h-1.5 w-1.5 rounded-full bg-[#A85F70]" />Live</span>
             </div>
-          </div>
+            <div className="relative min-h-[224px] overflow-hidden rounded-[6px] border border-[#D7C5AF] bg-[#FFFCF8] px-6 py-6 shadow-[0_18px_45px_rgba(71,49,32,0.12)] lg:min-h-[456px] lg:px-9 lg:py-10">
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#8C4E5F]" aria-hidden="true" />
+              <div className="flex h-full min-h-[176px] flex-col text-center lg:min-h-[376px]">
+                <Gift className="mx-auto text-[#9A596A]" size={30} strokeWidth={1.6} aria-hidden="true" />
+                <p className="mt-3 font-serif text-[26px] leading-8 text-[#522F38] lg:mt-7 lg:text-[30px]">
+                  {title || "A gift for you"}
+                </p>
+                <p className="mx-auto mt-3 max-w-[32ch] whitespace-pre-line text-[13px] leading-5 text-[#5F564B] lg:mt-7 lg:text-sm lg:leading-7">
+                  {message || "Your personal message will appear here."}
+                </p>
+                <div className="mt-auto grid grid-cols-2 gap-4 border-t border-[#E6DAC9] pt-4 text-left text-xs lg:pt-5">
+                  <div className="min-w-0"><span className="block text-[#927F6B]">To</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{recipient || "Recipient"}</strong></div>
+                  <div className="min-w-0 text-right"><span className="block text-[#927F6B]">From</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{sender || senderPlaceholder}</strong></div>
+                </div>
+              </div>
+            </div>
+            {readOnly ? (
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="ui-outline-control min-h-12 min-w-[112px] rounded-[8px] border border-[#D8CBB8] bg-white px-5 text-sm font-semibold text-[#31271F] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            ) : null}
+          </aside>
 
-          <form
-            className="space-y-5"
+          {!readOnly ? <form
+            className="space-y-5 p-5 pb-0 lg:p-8"
             onSubmit={(event) => {
               event.preventDefault();
               if (!canSave || busy) return;
@@ -1138,57 +1419,63 @@ function GiftMessageDialog({
               });
             }}
           >
+            <div>
+              <h3 className="text-xl font-semibold text-[#241C16]">Personalize the card</h3>
+              <p className="mt-1 text-sm leading-6 text-[#776A5D]">Use the preview to check exactly how your note will look.</p>
+            </div>
             <label className="block text-sm font-semibold text-[#2D241B]">
               <span className="mb-2 block">Title *</span>
-              <input ref={titleInputRef} required value={title} onChange={(event) => setTitle(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} />
+              <input required maxLength={48} value={title} onChange={(event) => setTitle(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} />
             </label>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className="block text-sm font-semibold text-[#2D241B]">
+                <span className="mb-2 block">Recipient name *</span>
+                <input required maxLength={40} value={recipient} onChange={(event) => setRecipient(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder="Their name" />
+              </label>
+              <label className="block text-sm font-semibold text-[#2D241B]">
+                <span className="mb-2 block">Your name *</span>
+                <input required maxLength={40} value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder={senderPlaceholder} />
+              </label>
+            </div>
             <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Your name *</span>
-              <input required value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} placeholder={senderPlaceholder} />
-            </label>
-            <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Recipient name *</span>
-              <input required value={recipient} onChange={(event) => setRecipient(event.target.value)} className={getInputClasses("min-h-[50px] bg-white text-base lg:text-sm")} />
-            </label>
-            <label className="block text-sm font-semibold text-[#2D241B]">
-              <span className="mb-2 block">Your message *</span>
+              <span className="mb-2 flex items-center justify-between gap-4"><span>Your message *</span><span className="font-normal text-[#8A7D70]">{message.length}/{messageLimit}</span></span>
               <textarea
                 required
+                maxLength={messageLimit}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                className={getInputClasses("min-h-[132px] resize-y bg-white text-base lg:text-sm")}
-                placeholder="Write the note that will be printed with the portrait."
+                className={getInputClasses("gift-message-dialog__control min-h-[126px] resize-y bg-white leading-6")}
+                placeholder="Write a personal note for the recipient."
               />
             </label>
-            <div className="flex flex-wrap gap-3 pt-2">
+            {error ? <p role="alert" className="text-sm font-medium leading-5 text-[#A33A32]">{error}</p> : null}
+            <div className="sticky bottom-0 -mx-5 flex gap-3 border-t border-[#E6DAC9] bg-[#FFFDFB]/95 px-5 py-4 backdrop-blur lg:static lg:mx-0 lg:justify-end lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-2">
               <button
                 type="button"
-                onClick={() => setPreviewNotice("Card preview is updated on the left.")}
-                className="ui-outline-control min-h-12 rounded-[8px] border border-[#D8CBB8] bg-white/72 px-5 text-sm font-semibold text-[#31271F] transition-colors"
+                onClick={onClose}
+                disabled={busy}
+                className="ui-outline-control min-h-12 flex-1 whitespace-nowrap rounded-[8px] border border-[#D8CBB8] bg-white px-3 text-sm font-semibold text-[#31271F] transition-colors sm:px-5 lg:flex-none"
               >
-                Card Preview
+                Cancel
               </button>
               <button
                 type="submit"
                 disabled={!canSave || busy}
-                className="min-h-12 rounded-[8px] bg-[#31271F] px-5 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99]"
+                className="min-h-12 flex-[1.4] whitespace-nowrap rounded-[8px] bg-[#31271F] px-3 text-sm font-semibold text-[#FBF8F3] transition-colors hover:bg-[#241C16] disabled:bg-[#B9AB99] sm:px-5 lg:flex-none"
                 aria-busy={busy}
               >
                 {busy ? "Saving..." : "Add Gift Message"}
               </button>
             </div>
-            <p aria-live="polite" className={`min-h-5 text-sm font-semibold text-[#5F564B] ${previewNotice ? "" : "sr-only"}`}>
-              {previewNotice}
-            </p>
-          </form>
+          </form> : null}
         </div>
       </section>
     </div>
   );
 }
 
-function PreviewImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+function PreviewImage({ src, alt, className, onLoad, style }: { src: string; alt: string; className: string; onLoad?: (event: ReactSyntheticEvent<HTMLImageElement>) => void; style?: CSSProperties }) {
   // Shopify media URLs are dynamic and cannot be enumerated in next.config.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} />;
+  return <img src={src} alt={alt} width={799} height={1200} loading="eager" decoding="async" className={className} onLoad={onLoad} style={style} />;
 }

@@ -5,6 +5,7 @@ import { getPublicConfig } from "@/lib/env";
 import { loadWorkspace } from "@/lib/orders";
 import {
   normalizeShopDomain,
+  publicShopKey,
   resolveShopConfig,
   tryResolveShopConfig,
 } from "@/lib/shops";
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       {
         ok: false,
         error: "shop_mismatch",
-        shop: shop.storeDomain,
+        shop: publicShopKey(shop.storeDomain),
       },
       { status: 409 },
     );
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       orders,
       csrf,
       config: getPublicConfig(shop),
-      shop: shop.storeDomain,
+      shop: publicShopKey(shop.storeDomain),
       savedArtworkCount: 0,
     });
   } catch (err) {

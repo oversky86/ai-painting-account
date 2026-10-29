@@ -91,10 +91,30 @@ a {
   line-height: 16px;
 }
 
+.gift-message-dialog__control {
+  font-size: 16px;
+}
+
+.gift-message-action {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.gift-message-dialog__control:focus-visible {
+  border-color: #241c16;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
 @media (min-width: 1024px) {
   .modification-composer__textarea {
     font-size: 13px;
     line-height: 19px;
+  }
+
+  .gift-message-dialog__control {
+    font-size: 14px;
   }
 }
 
@@ -121,6 +141,27 @@ a {
   line-height: 16px;
 }
 
+@keyframes storefront-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.storefront-mobile-menu {
+  animation: storefront-menu-in 220ms ease-out;
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storefront-mobile-menu {
+    animation: none;
+  }
+}
 .storefront-header__primary-action {
   width: auto;
   height: 40px;

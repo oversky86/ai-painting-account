@@ -2,7 +2,7 @@
 
 Headless Customer Account UI (My Orders / Payment Status / My Account), deployed on Vercel.
 
-- Production: https://ai-painting-account.vercel.app
+- Production: https://orders.viewbrush.com
 - Repo: https://github.com/oversky86/ai-painting-account (`master` → Vercel Production)
 - Local: `npm run dev` → http://127.0.0.1:3100
 - Env template: `.env.example`

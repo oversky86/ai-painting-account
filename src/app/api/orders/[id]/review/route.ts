@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth";
-import { assertCsrf } from "@/lib/session";
+import { assertCsrf, getOrderLinkCookie } from "@/lib/session";
 import { postSignedWrite } from "@/lib/hmac";
 import type { ModificationNote } from "@/lib/types";
 
@@ -9,7 +9,8 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const session = await getValidSession();
-  if (!session?.customerId) {
+  const orderLinkToken = session?.customerId ? null : await getOrderLinkCookie();
+  if (!session?.customerId && !orderLinkToken) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   try {
@@ -45,9 +46,10 @@ export async function POST(
 
   const res = await postSignedWrite("/api/account/order-write", {
     type: "review",
-    shop: session.shopDomain,
+    shop: session?.shopDomain,
     orderId: decodeURIComponent(id),
-    customerId: session.customerId,
+    customerId: session?.customerId,
+    orderLinkToken,
     action: body.action,
     notes,
     note: body.note || "",

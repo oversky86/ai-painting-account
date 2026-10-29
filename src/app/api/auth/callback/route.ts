@@ -8,7 +8,7 @@ import {
   setShopHint,
 } from "@/lib/session";
 import { caGraphql, exchangeCode } from "@/lib/shopify-ca";
-import { resolveShopConfig } from "@/lib/shops";
+import { publicShopKey, resolveShopConfig } from "@/lib/shops";
 
 export async function GET(request: NextRequest) {
   const { accountWebUrl } = getEnv();
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       ? pkce.returnTo
       : "/orders";
     const dest = new URL(`${accountWebUrl}${returnTo}`);
-    dest.searchParams.set("shop", shop.storeDomain);
+    dest.searchParams.set("shop", publicShopKey(shop.storeDomain));
     return NextResponse.redirect(dest.toString());
   } catch (err) {
     console.error("[auth/callback]", err);

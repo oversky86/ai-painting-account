@@ -1,28 +1,28 @@
-# account-web deploy (Period 1 — Vercel URL)
+# account-web 部署（第一阶段 — Vercel 地址）
 
-## 1. Create Vercel project
+## 1. 创建 Vercel 项目
 
-- Root directory: `app/account-web`
-- Framework: Next.js
-- After first deploy, copy the `*.vercel.app` URL into:
-  - Theme setting **Account web URL** (`settings.account_web_url`) — same URL for both shops
-  - `ACCOUNT_WEB_URL` env on this project
-  - `shopify.app.toml` + `shopify.app.production.toml` → `[customer_authentication].redirect_uris`
-  - `extensions/piktura-order-status/src/OrderStatusBlock.jsx` constant `ACCOUNT_WEB_URL`
+- 根目录：`app/account-web`
+- 框架：Next.js
+- 第一次部署后，把 `*.vercel.app` 地址填到：
+  - 主题设置 **Account web URL**（`settings.account_web_url`）——两家店用同一个地址
+  - 本项目的环境变量 `ACCOUNT_WEB_URL`
+  - `shopify.app.toml` 和 `shopify.app.production.toml` 的 `[customer_authentication].redirect_uris`
+  - `extensions/piktura-order-status/src/OrderStatusBlock.jsx` 里的常量 `ACCOUNT_WEB_URL`
 
-Theme links append `?shop={{ shop.permanent_domain }}` so one account-web host can serve **dev + prod**.
+主题链接使用 `?shop=dev` 或 `?shop=prod`，不写 Shopify 店铺域名。一个 account-web 地址可以同时服务开发店和线上店。
 
-## 2. Environment variables (account-web)
+## 2. 环境变量（account-web）
 
-| Name | Notes |
+| 名称 | 说明 |
 | --- | --- |
-| `ACCOUNT_WEB_URL` | `https://ai-painting-account.vercel.app` |
-| `ACCOUNT_SHOPS` | JSON array of shops (see `.env.example`) — **required for dual-shop** |
-| `SESSION_SECRET` | ≥32 random chars |
-| `ACCOUNT_HMAC_SECRET` | Shared with app |
+| `ACCOUNT_WEB_URL` | `https://orders.viewbrush.com` |
+| `ACCOUNT_SHOPS` | 店铺 JSON 数组（见 `.env.example`）。两家店都要配 |
+| `SESSION_SECRET` | 至少 32 位随机字符 |
+| `ACCOUNT_HMAC_SECRET` | 与 pet 应用相同 |
 | `APP_WRITE_API_URL` | `https://pet-paiting-app.vercel.app` |
 
-### `ACCOUNT_SHOPS` example
+### `ACCOUNT_SHOPS` 示例
 
 ```json
 [
@@ -43,38 +43,44 @@ Theme links append `?shop={{ shop.permanent_domain }}` so one account-web host c
 ]
 ```
 
-`view-brush.myshopify.com`、`viewbrush.com` 和 `www.viewbrush.com` 都解析到线上店这一条。代码里已经带了同一条内置配置；Vercel 上的 `ACCOUNT_SHOPS` 仍应改成上面的 JSON，并去掉旧店 `w4yzmt-vv.myshopify.com` 和旧 client id `95a4a997…`。不要把 API secret 写进这个 JSON。
+`view-brush.myshopify.com`、`viewbrush.com` 和 `www.viewbrush.com` 都解析到线上店这一条。代码里已经带了同一条内置配置。Vercel 上的 `ACCOUNT_SHOPS` 仍应改成上面的 JSON，并去掉旧店 `w4yzmt-vv.myshopify.com` 和旧 client id `95a4a997…`。不要把 API secret 写进这个 JSON。
 
-First entry is the default when `?shop=` is missing. Keep **prod first** in Production.
+没有 `?shop=` 时用数组的第一项。生产环境把线上店放在第一项。
 
-Legacy single-shop vars (`SHOPIFY_STORE_DOMAIN`, `SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID`, …) still work if `ACCOUNT_SHOPS` is unset.
+旧的单店变量（`SHOPIFY_STORE_DOMAIN`、`SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID` 等）在未设置 `ACCOUNT_SHOPS` 时仍然可用。
 
-## 3. Environment variables (ecommerce-pet-app)
+## 3. 环境变量（ecommerce-pet-app）
 
-| Name | Notes |
+| 名称 | 说明 |
 | --- | --- |
-| `ACCOUNT_HMAC_SECRET` | Same as account-web |
-| `ACCOUNT_WRITE_SHOPS` | Optional. Code already allows the dev store and `6hcr01-9t.myshopify.com`. Remove `w4yzmt-vv.myshopify.com` if it is still set. |
-| `SHOPIFY_API_SECRET_LIVE` | Secret for `ecommerce-pet-app-prod`. Do not commit it. App proxy also accepts it beside `SHOPIFY_API_SECRETS`. |
-| `SHOPIFY_API_KEY_LIVE` | Optional. Defaults to `a82e09b2fd0499c59c41187578e65b80`. |
+| `ACCOUNT_HMAC_SECRET` | 与 account-web 相同 |
+| `ACCOUNT_WRITE_SHOPS` | 可选。代码已经允许开发店和 `6hcr01-9t.myshopify.com`。如果还留着 `w4yzmt-vv.myshopify.com`，删掉 |
+| `SHOPIFY_API_SECRET_LIVE` | `ecommerce-pet-app-prod` 的 secret。不要提交到仓库。App Proxy 会把它和 `SHOPIFY_API_SECRETS` 一起用来验签 |
+| `SHOPIFY_API_KEY_LIVE` | 可选。默认是 `a82e09b2fd0499c59c41187578e65b80` |
 
-(`ACCOUNT_WRITE_SHOP` still works as a single-shop fallback.)
+`ACCOUNT_WRITE_SHOP` 仍可作为单店回退。
 
-## 4. Shopify app config
+## 4. Shopify 应用配置
 
-Both app configs need the same callback:
+两个应用配置都要有同一个回调：
 
 ```toml
 [customer_authentication]
-redirect_uris = [ "https://ai-painting-account.vercel.app/api/auth/callback" ]
+redirect_uris = [
+  "https://orders.viewbrush.com/api/auth/callback",
+  "https://ai-painting-account.vercel.app/api/auth/callback"
+]
 ```
 
-Then `shopify app deploy` for each config.
+然后对每个配置执行 `shopify app deploy`。
 
-## 5. Acceptance
+## 5. 验收
 
-- From **dev** storefront → `/orders?shop=e-commerce-dev-v6yidmlw.myshopify.com` → dev orders / native links
-- From **live** storefront → `/orders?shop=6hcr01-9t.myshopify.com` or `?shop=viewbrush.com` → live orders / native links
+- 从开发店店面进入 `/orders?shop=dev`，应看到开发店订单和该店的客户账户链接
+- 从线上店店面进入 `/orders?shop=prod`，应看到线上店订单和该店的客户账户链接
+- 已登录时切换店铺，会按目标店重新登录
+- 访客从店面登录进入账户页后，会带着 `shop` 跳到 account-web
+- 线上店退出登录后回到 https://www.viewbrush.com/；开发店退出后回到开发店首页
 
 ## 6. 新店上线还要做的操作
 
@@ -89,10 +95,7 @@ Then `shopify app deploy` for each config.
 5. 供应商工作台登录后可以在订单列表切换开发店和线上店。
 
 旧店 `w4yzmt-vv` 和旧应用 `ai-painting` 不再使用。checkout-ui-custom 这次不部署。
-- Switching shops while logged in forces re-auth for the target shop
-- Guest → storefront login → account page → redirect to account-web with `shop`
-- Sign out clears account-web session and returns toward that shop’s storefront logout
 
-## Deferred
+## 延后
 
-See [DEFERRED_SUBDOMAIN_DNS.md](./DEFERRED_SUBDOMAIN_DNS.md).
+见 [DEFERRED_SUBDOMAIN_DNS.md](./DEFERRED_SUBDOMAIN_DNS.md)。

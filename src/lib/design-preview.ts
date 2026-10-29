@@ -136,12 +136,17 @@ export function createDesignPreviewOrder(stage: OrderStage, hasVersionHistory = 
         ? {
             company: "UPS",
             number: "1Z999AA10123456784",
-            url: "https://www.ups.com/track",
+            url: "https://www.ups.com/track?loc=en_US&tracknum=1Z999AA10123456784",
             status: "In transit",
             estimatedDeliveryAt: "2026-08-28T12:00:00.000Z",
           }
         : null,
-    giftMessage: null,
+    giftMessage: stage === "complete" ? {
+      title: "A gift for you",
+      sender: "Ryan",
+      recipient: "Milo",
+      message: "Made especially for you.",
+    } : null,
     shippingAddress: designPreviewCustomer.defaultAddress,
     media: {
       paintingUrl: "/viewbrush-order-preview.webp",

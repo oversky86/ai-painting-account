@@ -74,6 +74,13 @@ function loginHref(returnPath?: string) {
   return `/api/auth/login?${params.toString()}`;
 }
 
+function stripOrderToken() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("token")) return;
+  url.searchParams.delete("token");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function parsedNotes(note?: string): ModificationNote[] {
   if (!note) return [];
   try {
@@ -95,6 +102,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   const [detailOpen, setDetailOpen] = useState(false);
   const [designPreview, setDesignPreview] = useState(false);
   const [flowCached, setFlowCached] = useState(false);
+  const [guest, setGuest] = useState(false);
 
   const reload = useCallback(async () => {
     const previewStage = previewStageFromLocation();
@@ -122,6 +130,34 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       const meUrl = shop ? `/api/me?shop=${encodeURIComponent(shop)}` : "/api/me";
       const response = await fetch(meUrl, { credentials: "same-origin" });
       if (response.status === 401) {
+        const onOrdersPage = window.location.pathname === "/orders";
+        const params = new URLSearchParams(window.location.search);
+        const link = onOrdersPage
+          ? await fetch("/api/order-link", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token: params.get("token") || "",
+                orderId: params.get("order") || "",
+              }),
+            })
+          : null;
+        if (link?.ok) {
+          const opened = (await link.json()) as MeResponse;
+          if (opened.ok && opened.customer) {
+            setGuest(true);
+            setCustomer(opened.customer);
+            setOrders(opened.orders || []);
+            setCsrf(opened.csrf || "");
+            setConfig(opened.config || null);
+            setDesignPreview(false);
+            setActiveView("orders");
+            if (params.get("order")) setDetailOpen(true);
+            stripOrderToken();
+            return;
+          }
+        }
         window.location.href = loginHref(window.location.pathname);
         return;
       }
@@ -135,11 +171,13 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       }
       const json = (await response.json()) as MeResponse;
       if (!json.ok || !json.customer) throw new Error(json.error || "Failed to load account");
+      setGuest(false);
       setCustomer(json.customer);
       setOrders(json.orders || []);
       setCsrf(json.csrf || "");
       setConfig(json.config || null);
       setDesignPreview(false);
+      stripOrderToken();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Failed to load");
     } finally {
@@ -152,8 +190,8 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   }, [reload]);
 
   useEffect(() => {
-    setActiveView(initialView);
-  }, [initialView]);
+    if (!guest) setActiveView(initialView);
+  }, [initialView, guest]);
 
   useEffect(() => {
     if (!customer || designPreview) return;
@@ -250,6 +288,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   };
 
   const usesAccountFooter = !loading && Boolean(customer);
+  const accountUnavailable = !loading && (Boolean(error) || !customer);
   const footerContext = detailOpen
     ? "order-detail"
     : activeView === "account"
@@ -259,10 +298,10 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   return (
     <div className="flex min-h-screen flex-col bg-[#FBF8F3] text-[#2D241B]">
       <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={flowEntryUrl} cartUrl={cartUrl} cached={flowCached} />
-      <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 pt-[88px] sm:px-6 lg:px-10 ${usesAccountFooter ? "pb-12" : "pb-[120px]"} ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}>
+      <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 sm:px-6 lg:px-10 ${accountUnavailable ? "flex flex-col justify-center py-12 lg:py-16" : `${usesAccountFooter ? "pb-12" : "pb-[120px]"} pt-[88px] ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}`}>
         {loading ? <p className="min-h-[240px] text-sm text-[#5F564B]" aria-live="polite">Loading your workspace…</p> : null}
-        {!loading && (error || !customer) ? (
-          <section className="min-h-[240px] rounded-[8px] border border-[#DCCFBC] bg-white p-6">
+        {accountUnavailable ? (
+          <section className="rounded-[8px] border border-[#DCCFBC] bg-white p-6 lg:p-8">
             <h1 className="text-2xl font-semibold">Unable to load account</h1>
             <p className="mt-3 text-sm text-[#5F564B]">{error || "Please sign in again."}</p>
             <a href={loginHref("/orders")} className="mt-6 inline-flex min-h-12 items-center rounded-[8px] bg-[#31271F] px-6 text-white">Sign in</a>
@@ -270,10 +309,10 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
         ) : null}
         {!loading && customer ? (
           <>
-            {!detailOpen ? <AccountHero customer={customer} onSignOut={() => { window.location.href = "/api/auth/logout"; }} /> : null}
-            {!detailOpen ? <AccountTabs activeView={activeView} onSelect={openView} /> : null}
+            {!detailOpen && !guest ? <AccountHero customer={customer} onSignOut={() => { window.location.href = "/api/auth/logout"; }} /> : null}
+            {!detailOpen && !guest ? <AccountTabs activeView={activeView} onSelect={openView} /> : null}
             <section className={detailOpen ? "" : "mt-5"}>
-              {activeView === "orders" ? (
+              {guest || activeView === "orders" ? (
                 <OrderWorkspace
                   orders={orders}
                   customer={customer}
@@ -283,8 +322,8 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
                   onDetailChange={setDetailOpen}
                 />
               ) : null}
-              {activeView === "payment-status" ? <PaymentStatusPanel accountOrders={orders} onCreate={() => { window.location.href = flowEntryUrl; }} /> : null}
-              {activeView === "account" ? <AccountOverview customer={customer} profileUrl={config?.nativeAccountProfileUrl || config?.nativeAccountUrl || "#"} /> : null}
+              {!guest && activeView === "payment-status" ? <PaymentStatusPanel accountOrders={orders} onCreate={() => { window.location.href = flowEntryUrl; }} /> : null}
+              {!guest && activeView === "account" ? <AccountOverview customer={customer} profileUrl={config?.nativeAccountProfileUrl || config?.nativeAccountUrl || "#"} /> : null}
             </section>
           </>
         ) : null}
