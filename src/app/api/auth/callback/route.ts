@@ -16,15 +16,24 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const error = request.nextUrl.searchParams.get("error");
 
-  if (error) {
-    return NextResponse.redirect(
-      `${accountWebUrl}/?error=${encodeURIComponent(error)}`,
-    );
-  }
-
   const pkce = await getPkce();
+  const errorUrl = (code: string, shopDomain?: string) => {
+    const dest = new URL(accountWebUrl);
+    dest.searchParams.set("error", code);
+    if (shopDomain) {
+      try {
+        dest.searchParams.set("shop", publicShopKey(shopDomain));
+      } catch {
+        /* keep the error redirect without a shop */
+      }
+    }
+    return NextResponse.redirect(dest.toString());
+  };
+
+  if (error) return errorUrl(error, pkce?.shopDomain);
+
   if (!code || !state || !pkce || pkce.state !== state) {
-    return NextResponse.redirect(`${accountWebUrl}/?error=invalid_state`);
+    return errorUrl("invalid_state", pkce?.shopDomain);
   }
 
   let shop;
@@ -32,7 +41,7 @@ export async function GET(request: NextRequest) {
     shop = resolveShopConfig(pkce.shopDomain);
   } catch {
     await clearPkce();
-    return NextResponse.redirect(`${accountWebUrl}/?error=unknown_shop`);
+    return errorUrl("unknown_shop", pkce.shopDomain);
   }
 
   try {
@@ -72,6 +81,6 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error("[auth/callback]", err);
     await clearPkce();
-    return NextResponse.redirect(`${accountWebUrl}/?error=token_exchange`);
+    return errorUrl("token_exchange", pkce.shopDomain);
   }
 }

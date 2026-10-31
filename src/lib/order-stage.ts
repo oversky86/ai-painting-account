@@ -87,8 +87,13 @@ export function businessStatusToStage(
   const status = normalizeBusinessStatus(businessStatus);
   const fulfillment = (fulfillmentStatus || "").toUpperCase();
 
-  if (status === "shipped" || fulfillment === "FULFILLED") {
-    return fulfillment === "FULFILLED" ? "shipping" : "shipping";
+  if (
+    status === "shipped" ||
+    status === "delivered" ||
+    status === "archived" ||
+    fulfillment === "FULFILLED"
+  ) {
+    return "shipping";
   }
   if (status === "prepare_shipment") return "framing";
   if (status === "supplier_modification") return "revision";

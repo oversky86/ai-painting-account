@@ -5,21 +5,15 @@ import {
   generateCodeVerifier,
   generateRandomString,
 } from "@/lib/pkce";
-import { getShopHint, setPkce, setShopHint } from "@/lib/session";
+import { setPkce, setShopHint } from "@/lib/session";
 import { getOpenIdConfig } from "@/lib/shopify-ca";
-import { resolveShopConfig, tryResolveShopConfig } from "@/lib/shops";
+import { resolveRequestedShop } from "@/lib/shops";
 
 export async function GET(request: NextRequest) {
   const { accountWebUrl } = getEnv();
   const returnTo =
     request.nextUrl.searchParams.get("return_to") || "/orders";
-  const shopParam = request.nextUrl.searchParams.get("shop");
-  let shop;
-  try {
-    shop = resolveShopConfig(shopParam || (await getShopHint()));
-  } catch {
-    shop = tryResolveShopConfig(null);
-  }
+  const shop = resolveRequestedShop(request.nextUrl.searchParams.get("shop"));
 
   await setShopHint(shop.storeDomain);
 

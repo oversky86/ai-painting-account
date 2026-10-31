@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth";
-import { assertCsrf, getOrderLinkCookie } from "@/lib/session";
+import { assertCsrf } from "@/lib/session";
 import { postSignedWrite } from "@/lib/hmac";
 import type { ModificationNote } from "@/lib/types";
 
@@ -9,7 +9,17 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const session = await getValidSession();
-  const orderLinkToken = session?.customerId ? null : await getOrderLinkCookie();
+  const { id } = await context.params;
+  const body = (await request.json()) as {
+    action?: "approve" | "modify";
+    note?: string;
+    notes?: ModificationNote[];
+    orderName?: string;
+    orderLinkToken?: string;
+  };
+  const orderLinkToken = session?.customerId
+    ? null
+    : String(body.orderLinkToken || "").trim();
   if (!session?.customerId && !orderLinkToken) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
@@ -18,14 +28,6 @@ export async function POST(
   } catch {
     return NextResponse.json({ ok: false, error: "csrf" }, { status: 403 });
   }
-
-  const { id } = await context.params;
-  const body = (await request.json()) as {
-    action?: "approve" | "modify";
-    note?: string;
-    notes?: ModificationNote[];
-    orderName?: string;
-  };
 
   if (!body.action) {
     return NextResponse.json(

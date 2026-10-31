@@ -4,6 +4,8 @@ export const BUSINESS_STATUSES = [
   "supplier_modification",
   "prepare_shipment",
   "shipped",
+  "delivered",
+  "archived",
 ] as const;
 
 export type BusinessStatus = (typeof BUSINESS_STATUSES)[number];

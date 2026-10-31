@@ -4,6 +4,7 @@ import {
   LIVE_STOREFRONT_CREATE_PATH,
   PUBLIC_SHOP_DEV,
   PUBLIC_SHOP_PROD,
+  requestedShopKey,
   STOREFRONT_CREATE_PATH,
 } from "./storefront-paths";
 
@@ -133,7 +134,8 @@ export function listShopConfigs(): ShopConfig[] {
 }
 
 export function getDefaultShopConfig(): ShopConfig {
-  return listShopConfigs()[0];
+  const shops = listShopConfigs();
+  return shops.find((shop) => shop.storeDomain === LIVE_SHOP_DOMAIN) || shops[0];
 }
 
 /**
@@ -142,7 +144,7 @@ export function getDefaultShopConfig(): ShopConfig {
  */
 export function resolveShopConfig(hint?: string | null): ShopConfig {
   const shops = listShopConfigs();
-  if (!hint?.trim()) return shops[0];
+  if (!hint?.trim()) return getDefaultShopConfig();
   const normalized = normalizeShopDomain(hint);
   const exact = shops.find((s) => s.storeDomain === normalized);
   if (exact) return exact;
@@ -164,6 +166,11 @@ export function resolveShopConfig(hint?: string | null): ShopConfig {
     if (live) return live;
   }
   throw new Error(`Unknown shop: ${normalized}`);
+}
+
+/** Public `shop` query: only `dev` selects the development store. */
+export function resolveRequestedShop(value?: string | null): ShopConfig {
+  return resolveShopConfig(requestedShopKey(value));
 }
 
 export function tryResolveShopConfig(hint?: string | null): ShopConfig {

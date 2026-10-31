@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import OrderWorkspace from "@/components/OrderWorkspace";
 import {
@@ -13,7 +13,7 @@ import {
   PaymentStatusPanel,
 } from "@/components/LegacyAccountPanels";
 import { createDesignPreviewOrder, designPreviewCustomer } from "@/lib/design-preview";
-import { STOREFRONT_CREATE_PATH, withFlowResumeFlag } from "@/lib/storefront-paths";
+import { requestedShopKey, STOREFRONT_CREATE_PATH, withFlowResumeFlag } from "@/lib/storefront-paths";
 import type {
   AccountOrder,
   AccountView,
@@ -52,8 +52,8 @@ const previewStages = new Set<OrderStage>([
 ]);
 
 function shopFromLocation() {
-  if (typeof window === "undefined") return "";
-  return new URLSearchParams(window.location.search).get("shop") || "";
+  if (typeof window === "undefined") return "prod";
+  return requestedShopKey(new URLSearchParams(window.location.search).get("shop"));
 }
 
 function previewStageFromLocation(): OrderStage | null {
@@ -66,12 +66,20 @@ function previewStageFromLocation(): OrderStage | null {
   return value && previewStages.has(value) ? value : null;
 }
 
-function loginHref(returnPath?: string) {
+function loginHref(returnPath?: string, shop?: string) {
   const path = returnPath || window.location.pathname || "/orders";
   const params = new URLSearchParams({ return_to: path });
-  const shop = shopFromLocation();
-  if (shop) params.set("shop", shop);
+  const key = shop || shopFromLocation();
+  if (key) params.set("shop", key);
   return `/api/auth/login?${params.toString()}`;
+}
+
+function rememberShop(shop: string) {
+  if (!shop || typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("shop") === shop) return;
+  url.searchParams.set("shop", shop);
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function stripOrderToken() {
@@ -103,6 +111,14 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   const [designPreview, setDesignPreview] = useState(false);
   const [flowCached, setFlowCached] = useState(false);
   const [guest, setGuest] = useState(false);
+  const [guestToken, setGuestToken] = useState("");
+  const [shopKey, setShopKey] = useState("prod");
+
+  useLayoutEffect(() => {
+    const shop = shopFromLocation();
+    setShopKey(shop);
+    rememberShop(shop);
+  }, []);
 
   const reload = useCallback(async () => {
     const previewStage = previewStageFromLocation();
@@ -127,38 +143,45 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
     setError(null);
     try {
       const shop = shopFromLocation();
+      if (shop) setShopKey(shop);
       const meUrl = shop ? `/api/me?shop=${encodeURIComponent(shop)}` : "/api/me";
       const response = await fetch(meUrl, { credentials: "same-origin" });
       if (response.status === 401) {
-        const onOrdersPage = window.location.pathname === "/orders";
         const params = new URLSearchParams(window.location.search);
-        const link = onOrdersPage
-          ? await fetch("/api/order-link", {
-              method: "POST",
-              credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                token: params.get("token") || "",
-                orderId: params.get("order") || "",
-              }),
-            })
-          : null;
+        const token = params.get("token") || "";
+        const link =
+          window.location.pathname === "/orders" && token
+            ? await fetch("/api/order-link", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  token,
+                  orderId: params.get("order") || "",
+                }),
+              })
+            : null;
         if (link?.ok) {
           const opened = (await link.json()) as MeResponse;
           if (opened.ok && opened.customer) {
             setGuest(true);
+            setGuestToken(token);
             setCustomer(opened.customer);
             setOrders(opened.orders || []);
             setCsrf(opened.csrf || "");
             setConfig(opened.config || null);
             setDesignPreview(false);
             setActiveView("orders");
+            if (opened.shop) {
+              setShopKey(opened.shop);
+              rememberShop(opened.shop);
+            }
             if (params.get("order")) setDetailOpen(true);
             stripOrderToken();
             return;
           }
         }
-        window.location.href = loginHref(window.location.pathname);
+        window.location.href = loginHref(window.location.pathname, shop);
         return;
       }
       if (response.status === 409) {
@@ -171,6 +194,10 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       }
       const json = (await response.json()) as MeResponse;
       if (!json.ok || !json.customer) throw new Error(json.error || "Failed to load account");
+      if (json.shop) {
+        setShopKey(json.shop);
+        rememberShop(json.shop);
+      }
       setGuest(false);
       setCustomer(json.customer);
       setOrders(json.orders || []);
@@ -274,6 +301,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
       note: note || "",
       notes: notes || [],
       orderName: order.name,
+      orderLinkToken: guestToken,
     });
     await reload();
   };
@@ -297,14 +325,14 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FBF8F3] text-[#2D241B]">
-      <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={flowEntryUrl} cartUrl={cartUrl} cached={flowCached} />
+      <StorefrontHeader storefrontUrl={storefrontUrl} createUrl={flowEntryUrl} cartUrl={cartUrl} cached={flowCached} shopKey={shopKey} />
       <main className={`mx-auto w-full max-w-[1280px] flex-1 px-4 sm:px-6 lg:px-10 ${accountUnavailable ? "flex flex-col justify-center py-12 lg:py-16" : `${usesAccountFooter ? "pb-12" : "pb-[120px]"} pt-[88px] ${detailOpen ? "lg:pt-[84px]" : "lg:pt-[112px]"}`}`}>
         {loading ? <p className="min-h-[240px] text-sm text-[#5F564B]" aria-live="polite">Loading your workspace…</p> : null}
         {accountUnavailable ? (
           <section className="rounded-[8px] border border-[#DCCFBC] bg-white p-6 lg:p-8">
             <h1 className="text-2xl font-semibold">Unable to load account</h1>
             <p className="mt-3 text-sm text-[#5F564B]">{error || "Please sign in again."}</p>
-            <a href={loginHref("/orders")} className="mt-6 inline-flex min-h-12 items-center rounded-[8px] bg-[#31271F] px-6 text-white">Sign in</a>
+            <a href={loginHref("/orders", shopKey)} className="mt-6 inline-flex min-h-12 items-center rounded-[8px] bg-[#31271F] px-6 text-white">Sign in</a>
           </section>
         ) : null}
         {!loading && customer ? (

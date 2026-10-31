@@ -1,29 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth";
-import { ensureCsrf, getShopHint, setShopHint } from "@/lib/session";
+import { clearOrderLinkCookie, ensureCsrf, setShopHint } from "@/lib/session";
 import { getPublicConfig } from "@/lib/env";
 import { loadWorkspace } from "@/lib/orders";
 import {
   normalizeShopDomain,
   publicShopKey,
-  resolveShopConfig,
-  tryResolveShopConfig,
+  resolveRequestedShop,
 } from "@/lib/shops";
 
 export async function GET(request: NextRequest) {
   const session = await getValidSession();
   if (!session) {
+    await clearOrderLinkCookie();
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const shopParam = request.nextUrl.searchParams.get("shop");
-  const hint = shopParam || (await getShopHint()) || session.shopDomain;
-  let shop;
-  try {
-    shop = resolveShopConfig(hint);
-  } catch {
-    shop = tryResolveShopConfig(session.shopDomain);
-  }
+  const shop = resolveRequestedShop(request.nextUrl.searchParams.get("shop"));
 
   // Logged into a different shop than the URL asks for → force re-auth
   if (

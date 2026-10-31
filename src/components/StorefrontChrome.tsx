@@ -9,7 +9,13 @@ type StorefrontChromeProps = {
   createUrl: string;
   cartUrl: string;
   cached?: boolean;
+  shopKey?: string;
 };
+
+function accountHref(shopKey?: string) {
+  const shop = shopKey === "dev" ? "dev" : "prod";
+  return `/account?shop=${shop}`;
+}
 
 const navigation = [
   { label: "How It Works", path: "/pages/how-it-works" },
@@ -27,6 +33,7 @@ export function StorefrontHeader({
   createUrl,
   cartUrl,
   cached = false,
+  shopKey = "",
 }: StorefrontChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -84,7 +91,7 @@ export function StorefrontHeader({
 
         <div className="flex flex-none items-center justify-end gap-2 sm:gap-3 md:gap-4 lg:gap-5">
           <a
-            href="/account"
+            href={accountHref(shopKey)}
             className="relative hidden h-[18px] w-[18px] items-center justify-center text-[#31271F] lg:inline-flex"
             aria-label="Account"
             aria-current="page"
@@ -145,7 +152,7 @@ export function StorefrontHeader({
               ))}
             </div>
             <div className="grid gap-1 border-t border-[#E8DECF] py-3">
-              <a href="/account" aria-current="page" className="flex min-h-[52px] items-center gap-3 rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]">
+              <a href={accountHref(shopKey)} aria-current="page" className="flex min-h-[52px] items-center gap-3 rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]">
                 <User size={16} aria-hidden="true" /> Account
               </a>
               <a href={cartUrl} className="flex min-h-[52px] items-center gap-3 rounded-[8px] px-4 py-3.5 text-base font-normal leading-6 text-[#2D241B] transition-colors hover:bg-[#F3EBDE]">

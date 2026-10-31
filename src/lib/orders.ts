@@ -356,19 +356,6 @@ function money(amount?: string | null, currency = "USD") {
   }
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
-}
-
 function mapPastCharges(order: CaOrder): PaymentChargeRow[] {
   const currency = order.totalPrice?.currencyCode || "USD";
   return (order.transactions || [])
@@ -386,7 +373,7 @@ function mapPastCharges(order: CaOrder): PaymentChargeRow[] {
       return {
         label: t.kind || "Payment",
         description: `Transaction ${t.kind || ""}`.trim(),
-        date: formatDate(t.processedAt || t.createdAt),
+        date: t.processedAt || t.createdAt || "",
         amount: money(amount?.amount, amount?.currencyCode || currency),
       };
     });
@@ -499,7 +486,12 @@ type PortraitHistory = {
   }>;
 };
 
-const APPROVED_STATUSES = new Set(["prepare_shipment", "shipped"]);
+const APPROVED_STATUSES = new Set([
+  "prepare_shipment",
+  "shipped",
+  "delivered",
+  "archived",
+]);
 
 /** One signed request for all orders instead of one per order. */
 async function fetchPortraitHistories(

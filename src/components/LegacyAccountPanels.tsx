@@ -272,6 +272,17 @@ function PaymentDetailRow({
   );
 }
 
+function formatLocalDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 function PaymentChargeTable({
   title,
   rows,
@@ -293,7 +304,7 @@ function PaymentChargeTable({
               <div>
                 <p className="text-sm font-semibold text-[#241C16]">{row.label}</p>
                 <p className="text-sm text-[#5F564B]">{row.description}</p>
-                <p className="mt-1 text-xs text-[#8F816C]">{row.date}</p>
+                <p className="mt-1 text-xs text-[#8F816C]">{formatLocalDate(row.date)}</p>
               </div>
               <p className="text-sm font-semibold text-[#241C16]">{row.amount}</p>
             </li>

@@ -7,6 +7,11 @@ export const DEV_SHOP_DOMAIN = "e-commerce-dev-v6yidmlw.myshopify.com";
 export const PUBLIC_SHOP_PROD = "prod";
 export const PUBLIC_SHOP_DEV = "dev";
 
+/** Missing or unrecognized `shop` query values use the live store. */
+export function requestedShopKey(value?: string | null): "prod" | "dev" {
+  return value?.trim().toLowerCase() === PUBLIC_SHOP_DEV ? PUBLIC_SHOP_DEV : PUBLIC_SHOP_PROD;
+}
+
 /** Query flag: the previous page already found a saved studio session. */
 export const FLOW_RESUME_PARAM = "vb_resume";
 

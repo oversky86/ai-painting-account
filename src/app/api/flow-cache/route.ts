@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth";
 import { postSignedWrite } from "@/lib/hmac";
-import { resolveShopConfig, tryResolveShopConfig } from "@/lib/shops";
+import { resolveRequestedShop } from "@/lib/shops";
 
 export async function GET(request: NextRequest) {
   const session = await getValidSession();
@@ -9,13 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, cached: false });
   }
 
-  const shopParam = request.nextUrl.searchParams.get("shop");
-  let shop;
-  try {
-    shop = resolveShopConfig(shopParam || session.shopDomain);
-  } catch {
-    shop = tryResolveShopConfig(session.shopDomain);
-  }
+  const shop = resolveRequestedShop(request.nextUrl.searchParams.get("shop"));
 
   try {
     const res = await postSignedWrite("/api/account/flow-cache", {

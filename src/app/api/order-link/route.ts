@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { getPublicConfig } from "@/lib/env";
 import { postSignedWrite } from "@/lib/hmac";
 import { guestCustomer, guestOrder } from "@/lib/guest-order";
-import {
-  clearOrderLinkCookie,
-  ensureCsrf,
-  getOrderLinkCookie,
-  setOrderLinkCookie,
-} from "@/lib/session";
+import { clearOrderLinkCookie, ensureCsrf } from "@/lib/session";
 import { resolveShopConfig } from "@/lib/shops";
 
 export async function POST(request: Request) {
@@ -15,7 +10,8 @@ export async function POST(request: Request) {
     token?: string;
     orderId?: string;
   };
-  const token = (body.token || (await getOrderLinkCookie()) || "").trim();
+  await clearOrderLinkCookie();
+  const token = (body.token || "").trim();
   if (!token) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
@@ -33,7 +29,6 @@ export async function POST(request: Request) {
     error?: string;
   } | null;
   if (!res.ok || !json?.ok || !json.order || !json.shop) {
-    await clearOrderLinkCookie();
     return NextResponse.json(
       { ok: false, error: json?.error || "unauthorized" },
       { status: res.status || 401 },
@@ -42,10 +37,8 @@ export async function POST(request: Request) {
 
   const remaining = Math.floor((json.exp || 0) - Date.now() / 1000);
   if (remaining <= 0) {
-    await clearOrderLinkCookie();
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
-  await setOrderLinkCookie(token, remaining);
   const shop = resolveShopConfig(json.shopKey || json.shop);
   const csrf = await ensureCsrf();
   return NextResponse.json({
