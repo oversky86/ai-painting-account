@@ -36,6 +36,7 @@ type MeResponse = {
   ok: boolean;
   customer?: CustomerSummary;
   orders?: AccountOrder[];
+  linkOrderId?: string;
   csrf?: string;
   config?: PublicConfig;
   shop?: string;
@@ -112,6 +113,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
   const [flowCached, setFlowCached] = useState(false);
   const [guest, setGuest] = useState(false);
   const [guestToken, setGuestToken] = useState("");
+  const [guestOrderId, setGuestOrderId] = useState("");
   const [shopKey, setShopKey] = useState("prod");
 
   useLayoutEffect(() => {
@@ -166,6 +168,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
           if (opened.ok && opened.customer) {
             setGuest(true);
             setGuestToken(token);
+            setGuestOrderId(opened.linkOrderId || params.get("order") || "");
             setCustomer(opened.customer);
             setOrders(opened.orders || []);
             setCsrf(opened.csrf || "");
@@ -199,6 +202,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
         rememberShop(json.shop);
       }
       setGuest(false);
+      setGuestOrderId("");
       setCustomer(json.customer);
       setOrders(json.orders || []);
       setCsrf(json.csrf || "");
@@ -344,6 +348,7 @@ export default function AccountApp({ initialView = "orders" }: { initialView?: A
                 <OrderWorkspace
                   orders={orders}
                   customer={customer}
+                  guestLinkOrderId={guest ? guestOrderId : ""}
                   onCreate={() => { window.location.href = flowEntryUrl; }}
                   onReview={handleReview}
                   onSaveGift={handleSaveGift}

@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     shopKey?: string;
     exp?: number;
     order?: Parameters<typeof guestOrder>[0];
+    orders?: Array<Parameters<typeof guestOrder>[0]>;
     error?: string;
   } | null;
   if (!res.ok || !json?.ok || !json.order || !json.shop) {
@@ -41,11 +42,13 @@ export async function POST(request: Request) {
   }
   const shop = resolveShopConfig(json.shopKey || json.shop);
   const csrf = await ensureCsrf();
+  const snapshots = json.orders?.length ? json.orders : [json.order];
   return NextResponse.json({
     ok: true,
     guest: true,
     customer: guestCustomer(json.order),
-    orders: [guestOrder(json.order)],
+    orders: snapshots.map((snapshot) => guestOrder(snapshot)),
+    linkOrderId: json.order.id,
     csrf,
     config: getPublicConfig(shop),
     shop: json.shopKey || json.shop,

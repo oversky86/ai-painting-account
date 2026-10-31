@@ -37,6 +37,8 @@ type MediaAsset = "final" | "reference" | "video";
 type OrderWorkspaceProps = {
   orders: AccountOrder[];
   customer: CustomerSummary;
+  /** Email-link order that can still be approved. Other guest orders send those actions to Shopify login. */
+  guestLinkOrderId?: string;
   onCreate: () => void;
   onReview: (
     order: AccountOrder,
@@ -101,6 +103,7 @@ function replaceOrderSearch(orderId: string | null) {
 export default function OrderWorkspace({
   orders,
   customer,
+  guestLinkOrderId = "",
   onCreate,
   onReview,
   onSaveGift,
@@ -129,6 +132,7 @@ export default function OrderWorkspace({
           replaceOrderSearch(null);
         }}
         onReview={onReview}
+        viewOnly={Boolean(guestLinkOrderId) && selectedOrder.id !== guestLinkOrderId}
       />
     );
   }
@@ -312,11 +316,13 @@ function OrderDetail({
   customer,
   onBack,
   onReview,
+  viewOnly = false,
 }: {
   order: AccountOrder;
   customer: CustomerSummary;
   onBack: () => void;
   onReview: OrderWorkspaceProps["onReview"];
+  viewOnly?: boolean;
 }) {
   const [mode, setMode] = useState<"detail" | "modify">("detail");
   const [approvalOpen, setApprovalOpen] = useState(false);
@@ -375,8 +381,20 @@ function OrderDetail({
         {order.orderStage === "review" ? (
           <ReviewPanel
             order={order}
-            onApprove={() => setApprovalOpen(true)}
-            onModify={() => setMode("modify")}
+            onApprove={() => {
+              if (viewOnly) {
+                redirectToShopifyLogin();
+                return;
+              }
+              setApprovalOpen(true);
+            }}
+            onModify={() => {
+              if (viewOnly) {
+                redirectToShopifyLogin();
+                return;
+              }
+              setMode("modify");
+            }}
           />
         ) : null}
         {order.orderStage === "revision" ? <RevisionPanel order={order} /> : null}
@@ -450,6 +468,17 @@ function ArtworkProgressPanel({ order }: { order: AccountOrder }) {
       </div>
     </article>
   );
+}
+
+function redirectToShopifyLogin() {
+  const current = new URL(window.location.href);
+  current.searchParams.delete("token");
+  const returnTo = `${current.pathname}${current.search}`;
+  const params = new URLSearchParams({
+    return_to: returnTo,
+    shop: current.searchParams.get("shop") || "prod",
+  });
+  window.location.assign(`/api/auth/login?${params.toString()}`);
 }
 
 function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onApprove: () => void; onModify: () => void }) {
