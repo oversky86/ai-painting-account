@@ -502,8 +502,6 @@ function ReviewPanel({ order, onApprove, onModify }: { order: AccountOrder; onAp
         <aside className="lg:flex lg:min-h-0 lg:flex-col">
           <MediaTabs order={order} selected={asset} onSelect={setAsset} />
           <div className="mt-6 border-t border-[#E7DCCC] pt-6 lg:flex lg:flex-1 lg:flex-col">
-            <h4 className="text-base font-bold">Decision</h4>
-            <p className="mt-3 text-sm leading-[22px] text-[#6C6054]">Approve the portrait for shipment, or open the modification page to mark requested changes.</p>
             <div className="mt-7 grid gap-3 lg:mt-auto">
               <button type="button" onClick={onApprove} className={buttonPrimary}>Approve Portrait</button>
               {order.canModify ? (
@@ -761,8 +759,12 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
   };
   const onPointerUp = () => {
     const selection = draftRef.current;
-    if (selection && selection.width >= 3 && selection.height >= 3) {
-      setPendingSelection(selection);
+    const start = startRef.current;
+    if (selection && start) {
+      const nextSelection = selection.width >= 3 && selection.height >= 3
+        ? selection
+        : { x: start.x, y: start.y, width: 0, height: 0 };
+      setPendingSelection(nextSelection);
       setPendingText("");
     }
     startRef.current = null;
@@ -778,7 +780,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
     if (pendingSelection) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    setPendingSelection({ x: 25, y: 25, width: 50, height: 50 });
+    setPendingSelection({ x: 50, y: 50, width: 0, height: 0 });
     setPendingText("");
   };
   const cancelPending = () => {
@@ -836,11 +838,11 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
         </header>
 
         <p className="mt-3 text-[14px] leading-[20px] text-[#6F6055] lg:hidden">
-          Drag on the portrait to select an area. Add your modification note beside the selected area.
+          Tap a point or drag to select an area, then add your modification note.
         </p>
 
         <div className="hidden h-[56px] items-center rounded-[8px] border border-[#D8C8B6] bg-[#FBF8F3] px-4 text-[14px] leading-[22px] text-[#4F443A] lg:mx-[31px] lg:mt-[25px] lg:flex">
-          Drag on the portrait to select an area. Add your modification note beside the selected area.
+          Click a point or drag to select an area, then add your modification note.
         </div>
 
         <div className="mt-5 grid gap-6 lg:mx-[30px] lg:mt-[23px] lg:grid-cols-[640px_374px] lg:gap-[33px]">
@@ -854,7 +856,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               onKeyDown={onCanvasKeyDown}
               role="application"
               tabIndex={0}
-              aria-label="Draw a rectangular modification area on the portrait"
+              aria-label="Click a point or draw a rectangular modification area on the portrait"
               className={`relative w-full touch-none overflow-hidden rounded-[8px] select-none lg:rounded-none ${imageIsWideForDesktopCanvas ? "lg:h-auto lg:w-full" : "lg:h-full lg:w-auto"} ${pendingSelection ? "cursor-default" : "cursor-crosshair ring-2 ring-[#2F9E5F]/20"}`}
               style={{ aspectRatio: imageAspectRatio }}
             >
@@ -891,7 +893,7 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
               {notes.length ? <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#C3AA87] px-1 text-[12px] font-bold leading-none text-white">{notes.length}</span> : null}
             </h3>
             <p className="mt-2 text-[13px] leading-[18px] text-[#6F6055] lg:text-[12px] lg:text-[#7B6B5C]">
-              Each selected area creates one numbered note for the artist.
+              Each point or selected area creates one numbered note for the artist.
             </p>
             <div className="mt-[18px] hidden h-px bg-[#DCCFBC] lg:block" />
             <div className="mt-4 grid gap-3 lg:mt-6">
@@ -910,8 +912,8 @@ function ModificationComposer({ image, initialNotes, busy, error, onCancel, onSu
                 </article>
               )) : (
                 <div className="min-h-[104px] rounded-[6px] border border-[#E1CCAC] bg-[#FCF8F4] px-[15px] py-[14px] text-left">
-                  <p className="text-[16px] font-semibold leading-[21px] text-[#2A201C]">No area selected yet</p>
-                  <p className="mt-2 text-[14px] leading-[19px] text-[#6F6055]">Drag on the portrait to select an area, then describe what should be adjusted.</p>
+                  <p className="text-[16px] font-semibold leading-[21px] text-[#2A201C]">No point or area selected yet</p>
+                  <p className="mt-2 text-[14px] leading-[19px] text-[#6F6055]">Click a point or drag to select an area, then describe what should be adjusted.</p>
                 </div>
               )}
             </div>
@@ -1003,7 +1005,29 @@ function PendingModificationEditor({
 }
 
 function SelectionOverlays({ notes, activeId }: { notes: ModificationNote[]; activeId?: string }) {
-  return <>{notes.map((note,index) => <span key={note.id} className={`pointer-events-none absolute border-2 ${activeId === note.id ? "border-[#D6534C] bg-[#D6534C]/12" : "border-[#3B9463] bg-[#3B9463]/10"}`} style={{ left:`${note.selection.x}%`, top:`${note.selection.y}%`, width:`${note.selection.width}%`, height:`${note.selection.height}%` }}><span className="absolute right-[-11px] top-1/2 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-white bg-[#D6534C] text-[11px] font-bold text-white">{index+1}</span></span>)}</>;
+  return <>{notes.map((note,index) => {
+    const isPoint = note.selection.width === 0 && note.selection.height === 0;
+    if (isPoint) {
+      return (
+        <span
+          key={note.id}
+          className="pointer-events-none absolute z-10 flex h-[24px] w-[24px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#D6534C] text-[11px] font-bold text-white shadow-[0_2px_7px_rgba(43,33,27,0.35)]"
+          style={{ left: `${note.selection.x}%`, top: `${note.selection.y}%` }}
+        >
+          {index + 1}
+        </span>
+      );
+    }
+    return (
+      <span
+        key={note.id}
+        className={`pointer-events-none absolute border-2 ${activeId === note.id ? "border-[#D6534C] bg-[#D6534C]/12" : "border-[#3B9463] bg-[#3B9463]/10"}`}
+        style={{ left: `${note.selection.x}%`, top: `${note.selection.y}%`, width: `${note.selection.width}%`, height: `${note.selection.height}%` }}
+      >
+        <span className="absolute right-[-11px] top-1/2 flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-full border border-white bg-[#D6534C] text-[11px] font-bold text-white">{index + 1}</span>
+      </span>
+    );
+  })}</>;
 }
 
 function AnnotatedImage({
