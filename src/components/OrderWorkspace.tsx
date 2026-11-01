@@ -162,7 +162,7 @@ export default function OrderWorkspace({
           <OrderListCard
             key={order.id}
             order={order}
-            senderPlaceholder={`${customer.firstName} ${customer.lastName}`.trim() || "Your name"}
+            senderName={`${customer.firstName} ${customer.lastName}`.trim()}
             onOpen={() => {
               setSelectedId(order.id);
               onDetailChange?.(true);
@@ -179,12 +179,12 @@ export default function OrderWorkspace({
 
 function OrderListCard({
   order,
-  senderPlaceholder,
+  senderName,
   onOpen,
   onSaveGift,
 }: {
   order: AccountOrder;
-  senderPlaceholder: string;
+  senderName: string;
   onOpen: () => void;
   onSaveGift: OrderWorkspaceProps["onSaveGift"];
 }) {
@@ -288,7 +288,7 @@ function OrderListCard({
       {giftOpen ? (
         <GiftMessageDialog
           initialMessage={order.giftMessage}
-          senderPlaceholder={senderPlaceholder}
+          senderName={senderName}
           busy={busy}
           error={giftError}
           readOnly={!order.canEditGift}
@@ -1337,7 +1337,7 @@ function FullScreenPreview({ image, video, onClose }: { image: string; video?: s
 
 function GiftMessageDialog({
   initialMessage,
-  senderPlaceholder,
+  senderName,
   busy,
   error,
   readOnly,
@@ -1345,7 +1345,7 @@ function GiftMessageDialog({
   onSave,
 }: {
   initialMessage: GiftMessage | null;
-  senderPlaceholder: string;
+  senderName: string;
   busy: boolean;
   error: string;
   readOnly: boolean;
@@ -1354,7 +1354,7 @@ function GiftMessageDialog({
 }) {
   const messageLimit = 240;
   const [title, setTitle] = useState(initialMessage?.title ?? "A gift for you");
-  const [sender, setSender] = useState(initialMessage?.sender ?? "");
+  const [sender, setSender] = useState(initialMessage?.sender ?? senderName);
   const [recipient, setRecipient] = useState(initialMessage?.recipient ?? "");
   const [message, setMessage] = useState(initialMessage?.message ?? "");
   const canSave = Boolean(title.trim() && sender.trim() && recipient.trim() && message.trim());
@@ -1418,7 +1418,7 @@ function GiftMessageDialog({
                 </p>
                 <div className="mt-auto grid grid-cols-2 gap-4 border-t border-[#E6DAC9] pt-4 text-left text-xs lg:pt-5">
                   <div className="min-w-0"><span className="block text-[#927F6B]">To</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{recipient || "Recipient"}</strong></div>
-                  <div className="min-w-0 text-right"><span className="block text-[#927F6B]">From</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{sender || senderPlaceholder}</strong></div>
+                  <div className="min-w-0 text-right"><span className="block text-[#927F6B]">From</span><strong className="mt-1 block truncate font-semibold text-[#382D25]">{sender || senderName || "Your name"}</strong></div>
                 </div>
               </div>
             </div>
@@ -1463,7 +1463,7 @@ function GiftMessageDialog({
               </label>
               <label className="block text-sm font-semibold text-[#2D241B]">
                 <span className="mb-2 block">Your name *</span>
-                <input required maxLength={40} value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder={senderPlaceholder} />
+                <input required maxLength={40} value={sender} onChange={(event) => setSender(event.target.value)} className={getInputClasses("gift-message-dialog__control min-h-[50px] bg-white")} placeholder="Your name" />
               </label>
             </div>
             <label className="block text-sm font-semibold text-[#2D241B]">
