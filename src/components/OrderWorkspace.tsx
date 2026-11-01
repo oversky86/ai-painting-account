@@ -1168,16 +1168,8 @@ function ModificationConfirmationDialog({
         >
           Submitting locks these notes and sends them to the artist for revision.
         </p>
-        <div className="mt-6 min-h-[106px] rounded-[6px] border border-[#DCCFBC] bg-[rgba(243,235,222,0.52)] px-[15px] pt-[19px] lg:mt-[17px] lg:min-h-[90px] lg:rounded-[8px] lg:px-[17px] lg:pt-[15px]">
-          <p className="text-[16px] font-semibold leading-[19px] text-[#2A201C] lg:text-[14px] lg:leading-5 lg:text-[#2B211C]">
-            Revision In Progress
-          </p>
-          <p className="mt-2 text-[14px] leading-5 text-[#6F6055] lg:mt-[6px] lg:text-[12px] lg:leading-[17px] lg:text-[#66594E]">
-            After submission, the order returns to artist work and the review button is disabled until the revised portrait is ready.
-          </p>
-        </div>
         {error ? <p role="alert" className="mt-3 text-sm text-[#B42318]">{error}</p> : null}
-        <div className="mt-6 grid gap-[14px] lg:mt-[39px] lg:grid-cols-2 lg:gap-4">
+        <div className="mt-6 grid gap-[14px] lg:mt-[31px] lg:grid-cols-2 lg:gap-4">
           <button
             type="button"
             disabled={busy}
@@ -1195,6 +1187,14 @@ function ModificationConfirmationDialog({
           >
             {busy ? "Submitting..." : "Submit Request"}
           </button>
+        </div>
+        <div className="mt-5 border-t border-[#E5DCCF] pt-4 lg:mt-5 lg:pt-[15px]">
+          <p className="text-[13px] font-semibold leading-[18px] text-[#4A3D34] lg:text-[12px] lg:leading-[17px]">
+            Revision In Progress
+          </p>
+          <p className="mt-1 text-[13px] leading-[19px] text-[#786B60] lg:text-[12px] lg:leading-[17px] lg:text-[#776B60]">
+            After submission, the order returns to artist work and the review button is disabled until the revised portrait is ready.
+          </p>
         </div>
       </div>
     </div>
